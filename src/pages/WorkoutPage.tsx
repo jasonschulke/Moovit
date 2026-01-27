@@ -36,8 +36,7 @@ export function WorkoutPage({
   const [finalEffort, setFinalEffort] = useState<EffortLevel | undefined>();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [expandedUpcoming, setExpandedUpcoming] = useState<Set<number>>(new Set([0])); // First block expanded by default
-  const [expandedCompleted, setExpandedCompleted] = useState<Set<number>>(new Set());
+  const [expandedUpcoming, setExpandedUpcoming] = useState<Set<number>>(new Set([0]));
 
   // Track elapsed time
   useEffect(() => {
@@ -112,113 +111,107 @@ export function WorkoutPage({
     ? { ...currentExercise, exerciseId: effectiveExerciseId }
     : null;
 
-  // Area labels for grouping
-  const AREA_LABELS: Record<string, string> = {
-    squat: 'Squat',
-    hinge: 'Hinge',
-    press: 'Press',
-    push: 'Push',
-    pull: 'Pull',
-    core: 'Core',
-    conditioning: 'Conditioning',
-    warmup: 'Warmup',
-    cooldown: 'Cooldown',
-    'full-body': 'Full Body',
-  };
+  // Build upcoming exercises grouped by set (for current block) then by future blocks
+  const upcomingGroups = useMemo(() => {
+    type ExerciseItem = { id: string; name: string; exerciseId: string };
+    type UpcomingGroup = { label: string; exercises: ExerciseItem[]; type: 'set' | 'block' };
 
-  // Build completed and upcoming exercises grouped by block then movement area
-  const { completedByBlock, upcomingByBlock } = useMemo(() => {
-    type ExerciseItem = { id: string; name: string; area: string };
-    type ExerciseWithCount = ExerciseItem & { count: number };
-    type AreaGroup = { area: string; areaLabel: string; exercises: ExerciseWithCount[] };
-    type BlockGroup = { blockName: string; blockType: string; areaGroups: AreaGroup[]; isFullyComplete: boolean };
+    const groups: UpcomingGroup[] = [];
 
-    const completedBlocks: BlockGroup[] = [];
-    const upcomingBlocks: BlockGroup[] = [];
+    // Current block - group remaining by set
+    if (currentBlock) {
+      const blockHasSets = [...new Set(currentBlock.exercises.map(e => e.sets).filter(Boolean))].length > 1;
 
+      if (blockHasSets && currentSetNumber) {
+        // Group remaining exercises by set
+        const setGroups = new Map<number, ExerciseItem[]>();
+
+        currentBlock.exercises.forEach((ex, eIdx) => {
+          if (eIdx <= currentExerciseIndex) return; // Skip current and past
+          const exercise = getExerciseById(ex.exerciseId);
+          if (!exercise) return;
+
+          const setNum = ex.sets || 1;
+          const existing = setGroups.get(setNum) || [];
+          existing.push({ id: exercise.id, name: exercise.name, exerciseId: ex.exerciseId });
+          setGroups.set(setNum, existing);
+        });
+
+        // Add current set remaining first
+        const currentSetRemaining = setGroups.get(currentSetNumber);
+        if (currentSetRemaining && currentSetRemaining.length > 0) {
+          groups.push({
+            label: `Remaining in Set ${currentSetNumber}`,
+            exercises: currentSetRemaining,
+            type: 'set',
+          });
+        }
+
+        // Add future sets
+        Array.from(setGroups.entries())
+          .filter(([setNum]) => setNum > currentSetNumber)
+          .sort((a, b) => a[0] - b[0])
+          .forEach(([setNum, exercises]) => {
+            groups.push({
+              label: `Set ${setNum}`,
+              exercises,
+              type: 'set',
+            });
+          });
+      } else {
+        // No sets - just show remaining exercises
+        const remaining: ExerciseItem[] = [];
+        currentBlock.exercises.forEach((ex, eIdx) => {
+          if (eIdx <= currentExerciseIndex) return;
+          const exercise = getExerciseById(ex.exerciseId);
+          if (!exercise) return;
+          remaining.push({ id: exercise.id, name: exercise.name, exerciseId: ex.exerciseId });
+        });
+
+        if (remaining.length > 0) {
+          groups.push({
+            label: 'Remaining',
+            exercises: remaining,
+            type: 'set',
+          });
+        }
+      }
+    }
+
+    // Future blocks
     blocks.forEach((block, bIdx) => {
-      const completedInBlock: ExerciseItem[] = [];
-      const upcomingInBlock: ExerciseItem[] = [];
+      if (bIdx <= currentBlockIndex) return;
 
-      block.exercises.forEach((ex, eIdx) => {
+      const exercises: ExerciseItem[] = [];
+      block.exercises.forEach(ex => {
         const exercise = getExerciseById(ex.exerciseId);
         if (!exercise) return;
-
-        const isCurrent = bIdx === currentBlockIndex && eIdx === currentExerciseIndex;
-        const isPast = bIdx < currentBlockIndex || (bIdx === currentBlockIndex && eIdx < currentExerciseIndex);
-
-        const item: ExerciseItem = { id: exercise.id, name: exercise.name, area: exercise.area };
-
-        if (isPast) {
-          completedInBlock.push(item);
-        } else if (!isCurrent) {
-          upcomingInBlock.push(item);
-        }
+        exercises.push({ id: exercise.id, name: exercise.name, exerciseId: ex.exerciseId });
       });
 
-      // Group by movement area with deduplication and counts
-      const groupByArea = (items: ExerciseItem[], dedupe = false): AreaGroup[] => {
-        const areaMap = new Map<string, ExerciseItem[]>();
-        items.forEach(item => {
-          const existing = areaMap.get(item.area) || [];
-          existing.push(item);
-          areaMap.set(item.area, existing);
-        });
-        return Array.from(areaMap.entries()).map(([area, exercises]) => {
-          if (dedupe) {
-            // Count occurrences and deduplicate
-            const countMap = new Map<string, { exercise: ExerciseItem; count: number }>();
-            exercises.forEach(ex => {
-              const existing = countMap.get(ex.id);
-              if (existing) {
-                existing.count++;
-              } else {
-                countMap.set(ex.id, { exercise: ex, count: 1 });
-              }
-            });
-            return {
-              area,
-              areaLabel: AREA_LABELS[area] || area,
-              exercises: Array.from(countMap.values()).map(({ exercise, count }) => ({
-                ...exercise,
-                count,
-              })),
-            };
-          }
-          return {
-            area,
-            areaLabel: AREA_LABELS[area] || area,
-            exercises: exercises.map(e => ({ ...e, count: 1 })),
-          };
-        });
-      };
-
-      // Block is fully complete if we've moved past it entirely
-      const isFullyComplete = bIdx < currentBlockIndex;
-
-      if (completedInBlock.length > 0) {
-        completedBlocks.push({
-          blockName: block.name,
-          blockType: block.type,
-          areaGroups: groupByArea(completedInBlock, true),
-          isFullyComplete,
-        });
-      }
-
-      if (upcomingInBlock.length > 0) {
-        upcomingBlocks.push({
-          blockName: block.name,
-          blockType: block.type,
-          areaGroups: groupByArea(upcomingInBlock, true),
-          isFullyComplete: false, // upcoming blocks are never fully complete
+      if (exercises.length > 0) {
+        groups.push({
+          label: block.name,
+          exercises,
+          type: 'block',
         });
       }
     });
 
-    return {
-      completedByBlock: completedBlocks,
-      upcomingByBlock: upcomingBlocks,
-    };
+    return groups;
+  }, [blocks, currentBlock, currentBlockIndex, currentExerciseIndex, currentSetNumber]);
+
+  // Build completed count
+  const completedCount = useMemo(() => {
+    let count = 0;
+    blocks.forEach((block, bIdx) => {
+      block.exercises.forEach((_, eIdx) => {
+        if (bIdx < currentBlockIndex || (bIdx === currentBlockIndex && eIdx < currentExerciseIndex)) {
+          count++;
+        }
+      });
+    });
+    return count;
   }, [blocks, currentBlockIndex, currentExerciseIndex]);
 
   const handleComplete = (log: Parameters<typeof onLogExercise>[0]) => {
@@ -372,71 +365,68 @@ export function WorkoutPage({
         </div>
       </div>
 
-      {/* Timeline Card - Step Dots */}
+      {/* Progress Card - Clear block/set/exercise indicator */}
       <div className="px-4 pt-4">
-        <div className="px-8 py-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          {/* Step Dots Progress */}
-          <div className="relative flex items-center justify-between">
-            {/* Connecting line (background) */}
-            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 dark:bg-slate-700 -translate-y-1/2" />
-            {/* Connecting line (progress) */}
-            <div
-              className="absolute top-1/2 left-0 h-0.5 bg-emerald-500 -translate-y-1/2 transition-all duration-300"
-              style={{ width: `${(currentBlockIndex / Math.max(timelineBlocks.length - 1, 1)) * 100}%` }}
-            />
+        <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+          {/* Block progress bar with labels */}
+          <div className="flex gap-1 mb-2">
+            {timelineBlocks.map((block, idx) => {
+              // Calculate progress percentage for current block
+              let progressPercent = 0;
+              if (block.isComplete) {
+                progressPercent = 100;
+              } else if (block.isCurrent && currentBlock) {
+                const totalExercises = currentBlock.exercises.length;
+                // currentExerciseIndex is 0-based, so this gives completed count
+                progressPercent = (currentExerciseIndex / totalExercises) * 100;
+              }
 
-            {timelineBlocks.map((block, idx) => (
-              <div key={idx} className="relative flex flex-col items-center z-10">
-                {/* Step Circle */}
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
-                    block.isComplete
-                      ? 'bg-emerald-500 text-white'
-                      : block.isCurrent
-                        ? 'bg-emerald-500 text-white ring-4 ring-emerald-500/30'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
-                  }`}
-                >
-                  {block.isComplete ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    idx + 1
-                  )}
-                </div>
-                {/* Block Name */}
-                <span className={`absolute top-10 text-[10px] font-medium whitespace-nowrap ${
-                  block.isCurrent
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : block.isComplete
-                      ? 'text-slate-500 dark:text-slate-400'
-                      : 'text-slate-400 dark:text-slate-500'
-                }`}>
-                  {block.name}
-                </span>
-                {/* Set dots for current block */}
-                {block.isCurrent && block.hasSets && (
-                  <div className="absolute top-[52px] flex gap-1">
-                    {block.sets.map((set, setIdx) => (
-                      <span
-                        key={setIdx}
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          set.isComplete
-                            ? 'bg-emerald-400'
-                            : set.isCurrent
-                              ? 'bg-emerald-500'
-                              : 'bg-slate-300 dark:bg-slate-600'
-                        }`}
-                      />
-                    ))}
+              return (
+                <div key={idx} className="flex-1">
+                  <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
                   </div>
-                )}
-              </div>
-            ))}
+                  <div className={`text-[10px] mt-1 text-center truncate ${
+                    block.isCurrent
+                      ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                      : block.isComplete
+                        ? 'text-slate-500 dark:text-slate-400'
+                        : 'text-slate-400 dark:text-slate-500'
+                  }`}>
+                    {block.name}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          {/* Spacer for block names and set dots below */}
-          <div className="h-8" />
+
+          {/* Current position */}
+          <div className="flex items-center justify-between mt-3">
+            <div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {currentBlock?.name}
+              </div>
+              {hasMultipleSets && currentSetNumber && (
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  Set {currentSetNumber} of {totalSetsInBlock}
+                </div>
+              )}
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {hasMultipleSets && currentSetNumber
+                  ? `${exerciseIndexInSet}/${exercisesInCurrentSet.length}`
+                  : `${currentExerciseIndex + 1}/${currentBlock?.exercises.length}`
+                }
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                exercises
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -456,80 +446,67 @@ export function WorkoutPage({
           </div>
         )}
 
-        {/* Upcoming Exercises Section */}
-        {upcomingByBlock.length > 0 && (
+        {/* Upcoming Exercises - Collapsible cards grouped by set */}
+        {upcomingGroups.length > 0 && (
           <section className="px-4 pt-2 pb-2">
             <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">Up Next</h2>
-            <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
-              {upcomingByBlock.map((block, blockIdx) => {
-                const blockExerciseCount = block.areaGroups.reduce((acc, g) =>
-                  acc + g.exercises.reduce((sum, e) => sum + e.count, 0), 0);
-
-                const isExpanded = expandedUpcoming.has(blockIdx);
-
+            <div className="space-y-3">
+              {upcomingGroups.map((group, groupIdx) => {
+                const isExpanded = expandedUpcoming.has(groupIdx);
                 const toggleExpand = () => {
                   setExpandedUpcoming(prev => {
                     const next = new Set(prev);
-                    if (next.has(blockIdx)) {
-                      next.delete(blockIdx);
+                    if (next.has(groupIdx)) {
+                      next.delete(groupIdx);
                     } else {
-                      next.add(blockIdx);
+                      next.add(groupIdx);
                     }
                     return next;
                   });
                 };
 
                 return (
-                  <div key={blockIdx}>
-                    {/* Block Header - Clickable */}
+                  <div
+                    key={groupIdx}
+                    className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+                  >
                     <button
                       onClick={toggleExpand}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                     >
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                        {block.blockName}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400 dark:text-slate-500">
-                          {blockExerciseCount} exercises
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          group.type === 'set'
+                            ? 'text-emerald-700 dark:text-emerald-400'
+                            : 'text-slate-600 dark:text-slate-300'
+                        }`}>
+                          {group.label}
                         </span>
-                        <svg
-                          className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 ml-2">
+                          {group.exercises.length} exercise{group.exercises.length !== 1 ? 's' : ''}
+                        </span>
                       </div>
+                      <svg
+                        className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     </button>
-                    {/* Movement Groups - collapsible */}
                     {isExpanded && (
-                      <div className="px-4 pb-3 space-y-2">
-                        {block.areaGroups.map((group, groupIdx) => (
-                          <div key={groupIdx}>
-                            {block.areaGroups.length > 1 && (
-                              <div className="text-xs text-slate-400 dark:text-slate-500 mb-1 font-medium">
-                                {group.areaLabel}
-                              </div>
-                            )}
-                            <div className="flex flex-wrap gap-1.5">
-                              {group.exercises.map((ex, exIdx) => (
-                                <span
-                                  key={exIdx}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-                                >
-                                  {ex.name}
-                                  {ex.count > 1 && (
-                                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                                      ×{ex.count}
-                                    </span>
-                                  )}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
+                      <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700">
+                        <div className="flex flex-wrap gap-2">
+                          {group.exercises.map((ex, exIdx) => (
+                            <span
+                              key={exIdx}
+                              className="px-2.5 py-1 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                            >
+                              {ex.name}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -539,97 +516,14 @@ export function WorkoutPage({
           </section>
         )}
 
-        {/* Completed Exercises Section - Reference only, at bottom */}
-        {completedByBlock.length > 0 && (
+        {/* Completed count - minimal */}
+        {completedCount > 0 && (
           <section className="px-4 pt-2 pb-4">
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">Completed</h2>
-            <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
-              {completedByBlock.map((block, blockIdx) => {
-                const blockExerciseCount = block.areaGroups.reduce((acc, g) =>
-                  acc + g.exercises.reduce((sum, e) => sum + e.count, 0), 0);
-
-                const toggleExpand = () => {
-                  setExpandedCompleted(prev => {
-                    const next = new Set(prev);
-                    if (block.isFullyComplete) {
-                      // For fully complete blocks, toggle normally
-                      if (next.has(blockIdx)) {
-                        next.delete(blockIdx);
-                      } else {
-                        next.add(blockIdx);
-                      }
-                    } else {
-                      // For partially complete, track if user explicitly collapsed
-                      if (next.has(blockIdx)) {
-                        next.delete(blockIdx);
-                      } else {
-                        next.add(blockIdx);
-                      }
-                    }
-                    return next;
-                  });
-                };
-
-                // Check if user explicitly toggled a partially complete block
-                const userCollapsed = !block.isFullyComplete && expandedCompleted.has(blockIdx);
-                const showContent = block.isFullyComplete ? expandedCompleted.has(blockIdx) : !userCollapsed;
-
-                return (
-                  <div key={blockIdx}>
-                    {/* Block Header - Clickable */}
-                    <button
-                      onClick={toggleExpand}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                    >
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                        {block.blockName}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                          {blockExerciseCount} done
-                        </span>
-                        <svg
-                          className={`w-4 h-4 text-slate-400 transition-transform ${showContent ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </button>
-                    {/* Movement Groups - collapsible */}
-                    {showContent && (
-                      <div className="px-4 pb-3 space-y-2">
-                        {block.areaGroups.map((group, groupIdx) => (
-                          <div key={groupIdx}>
-                            {block.areaGroups.length > 1 && (
-                              <div className="text-xs text-slate-400 dark:text-slate-500 mb-1 font-medium">
-                                {group.areaLabel}
-                              </div>
-                            )}
-                            <div className="flex flex-wrap gap-1.5">
-                              {group.exercises.map((ex, exIdx) => (
-                                <span
-                                  key={exIdx}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                                >
-                                  {ex.name}
-                                  {ex.count > 1 && (
-                                    <span className="text-[10px] text-emerald-500 dark:text-emerald-400">
-                                      ×{ex.count}
-                                    </span>
-                                  )}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {completedCount} exercise{completedCount !== 1 ? 's' : ''} completed
             </div>
           </section>
         )}

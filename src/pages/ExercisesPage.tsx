@@ -47,7 +47,7 @@ export function ExercisesPage() {
 
     return (
       <div className="min-h-screen pb-24 bg-slate-100 dark:bg-slate-950">
-        <header className="px-4 pt-14 pb-4 safe-top">
+        <header className="px-4 pt-16 pb-4 safe-top">
           <button
             onClick={() => setSelectedExercise(null)}
             className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 mb-4"
@@ -160,7 +160,7 @@ export function ExercisesPage() {
 
   return (
     <div className="min-h-screen pb-24 bg-slate-100 dark:bg-slate-950">
-      <header className="px-4 pt-14 pb-4 safe-top">
+      <header className="px-4 pt-16 pb-4 safe-top">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Exercises</h1>
         <p className="text-slate-500 dark:text-slate-400 mt-1">{exercises.length} exercises</p>
       </header>

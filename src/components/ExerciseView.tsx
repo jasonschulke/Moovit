@@ -160,7 +160,7 @@ export function ExerciseView({
         {/* Timer - Collapsible */}
         {showTimer && (
           <div className="mb-6">
-            <Timer autoStart={false} />
+            <Timer autoStart={true} />
           </div>
         )}
 

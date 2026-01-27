@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import type { Exercise, BlockType, WorkoutExercise, WorkoutBlock, WorkoutSet, MuscleArea } from '../types';
 import { getAllExercises, getAlternatives } from '../data/exercises';
 
@@ -43,10 +43,7 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
   });
   const [currentSet, setCurrentSet] = useState(1); // For strength block
   const [searchQuery, setSearchQuery] = useState('');
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [showSwapFor, setShowSwapFor] = useState<string | null>(null);
-  const dragStartIndex = useRef<number | null>(null);
 
   const exercises = useMemo(() => getAllExercises(), []);
   const currentBlock = BLOCK_TYPES[currentBlockIndex];
@@ -111,39 +108,28 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
     setShowSwapFor(null);
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (exerciseId: string, index: number) => {
-    setDraggedId(exerciseId);
-    dragStartIndex.current = index;
+  // Reorder handlers
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    setSelectedExercises(prev => {
+      const blockData = { ...prev[currentBlock.type] };
+      const current = [...(blockData[activeSetKey] || [])];
+      [current[index - 1], current[index]] = [current[index], current[index - 1]];
+      blockData[activeSetKey] = current;
+      return { ...prev, [currentBlock.type]: blockData };
+    });
   };
 
-  const handleDragOver = (e: React.DragEvent, exerciseId: string) => {
-    e.preventDefault();
-    if (exerciseId !== draggedId) {
-      setDragOverId(exerciseId);
-    }
-  };
-
-  const handleDragEnd = () => {
-    if (draggedId && dragOverId && draggedId !== dragOverId) {
-      setSelectedExercises(prev => {
-        const blockData = { ...prev[currentBlock.type] };
-        const current = [...(blockData[activeSetKey] || [])];
-        const fromIndex = current.indexOf(draggedId);
-        const toIndex = current.indexOf(dragOverId);
-
-        if (fromIndex !== -1 && toIndex !== -1) {
-          current.splice(fromIndex, 1);
-          current.splice(toIndex, 0, draggedId);
-          blockData[activeSetKey] = current;
-        }
-
-        return { ...prev, [currentBlock.type]: blockData };
-      });
-    }
-    setDraggedId(null);
-    setDragOverId(null);
-    dragStartIndex.current = null;
+  const handleMoveDown = (index: number) => {
+    const current = selectedExercises[currentBlock.type][activeSetKey] || [];
+    if (index >= current.length - 1) return;
+    setSelectedExercises(prev => {
+      const blockData = { ...prev[currentBlock.type] };
+      const arr = [...(blockData[activeSetKey] || [])];
+      [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]];
+      blockData[activeSetKey] = arr;
+      return { ...prev, [currentBlock.type]: blockData };
+    });
   };
 
   // Group available exercises by movement area
@@ -275,21 +261,21 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
   }, [selectedExercises]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 dark:bg-slate-950">
+    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950">
       {/* Header */}
-      <header className="px-4 pt-12 pb-4 safe-top border-b border-slate-800">
+      <header className="px-4 pt-16 pb-4 safe-top border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
         <div className="flex items-center justify-between mb-2">
-          <button onClick={handleBack} className="text-slate-400 hover:text-slate-200">
+          <button onClick={handleBack} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-slate-500 dark:text-slate-500">
             {totalSelected} exercise{totalSelected !== 1 ? 's' : ''} selected
           </span>
         </div>
-        <h1 className="text-2xl font-bold text-slate-100">{currentBlock.label}</h1>
-        <p className="text-slate-400 text-sm mt-1">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{currentBlock.label}</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
           {hasSets
             ? `Select exercises for Set ${currentSet}`
             : `Select exercises for your ${currentBlock.label.toLowerCase()} block`
@@ -306,7 +292,7 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
                   ? 'bg-emerald-500'
                   : i === currentBlockIndex
                   ? 'bg-emerald-600'
-                  : 'bg-slate-700'
+                  : 'bg-slate-300 dark:bg-slate-700'
               }`}
             />
           ))}
@@ -315,7 +301,7 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
 
       {/* Set Tabs (for strength block) */}
       {hasSets && (
-        <div className="px-4 py-3 border-b border-slate-800">
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
           <div className="flex gap-2">
             {[1, 2, 3].map(setNum => {
               const setCount = (selectedExercises[currentBlock.type][setNum] || []).length;
@@ -326,13 +312,13 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
                   className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors ${
                     currentSet === setNum
                       ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
                   Set {setNum}
                   {setCount > 0 && (
                     <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
-                      currentSet === setNum ? 'bg-emerald-500' : 'bg-slate-700'
+                      currentSet === setNum ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
                     }`}>
                       {setCount}
                     </span>
@@ -343,7 +329,7 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
           </div>
           <button
             onClick={applyToAllSets}
-            className="w-full mt-2 py-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+            className="w-full mt-2 py-2 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors"
           >
             Apply Set {currentSet} to all sets
           </button>
@@ -351,9 +337,9 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
       )}
 
       {/* Search */}
-      <div className="px-4 py-3">
+      <div className="px-4 py-3 bg-slate-100 dark:bg-slate-950">
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -361,17 +347,17 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search exercises..."
-            className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            className="w-full pl-10 pr-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500"
           />
         </div>
       </div>
 
       {/* Exercise List */}
-      <div className="flex-1 overflow-y-auto px-4 pb-32">
+      <div className="flex-1 overflow-y-auto px-4 pb-32 bg-slate-100 dark:bg-slate-950">
         {currentSelections.length > 0 && (
           <div className="mb-6">
-            <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
-              {hasSets ? `Set ${currentSet}` : 'Selected'} ({currentSelections.length}) — drag to reorder
+            <div className="text-xs text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-2">
+              {hasSets ? `Set ${currentSet}` : 'Selected'} ({currentSelections.length})
             </div>
             <div className="space-y-2">
               {currentSelections.map((id, index) => {
@@ -382,26 +368,25 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
                   <div key={id}>
                     <DraggableExerciseCard
                       exercise={exercise}
-                      isDragging={draggedId === id}
-                      isDragOver={dragOverId === id}
-                      onDragStart={() => handleDragStart(id, index)}
-                      onDragOver={(e) => handleDragOver(e, id)}
-                      onDragEnd={handleDragEnd}
+                      index={index}
+                      total={currentSelections.length}
+                      onMoveUp={() => handleMoveUp(index)}
+                      onMoveDown={() => handleMoveDown(index)}
                       onRemove={() => toggleExercise(id)}
                       onSwap={alternatives.length > 0 ? () => setShowSwapFor(showSwapFor === id ? null : id) : undefined}
                     />
                     {showSwapFor === id && alternatives.length > 0 && (
-                      <div className="mt-2 ml-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700">
-                        <div className="text-xs text-slate-400 mb-2">Swap with:</div>
+                      <div className="mt-2 ml-4 p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Swap with:</div>
                         <div className="space-y-1">
                           {alternatives.map(alt => (
                             <button
                               key={alt.id}
                               onClick={() => swapExercise(id, alt.id)}
-                              className="w-full p-2 rounded-lg text-left text-sm bg-slate-700/50 hover:bg-slate-700 text-slate-200 transition-colors"
+                              className="w-full p-2 rounded-lg text-left text-sm bg-white dark:bg-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors border border-slate-200 dark:border-transparent"
                             >
                               {alt.name}
-                              <span className="text-slate-400 ml-2 text-xs">{alt.equipment}</span>
+                              <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs">{alt.equipment}</span>
                             </button>
                           ))}
                         </div>
@@ -417,7 +402,7 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
         {/* Group exercises by movement area */}
         {groupedExercises.map(group => (
           <div key={group.area} className="mb-6">
-            <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+            <div className="text-xs text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-2">
               {group.label}
             </div>
             <div className="space-y-2">
@@ -434,24 +419,24 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
         ))}
 
         {groupedExercises.length === 0 && currentSelections.length === 0 && (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 text-slate-500 dark:text-slate-500">
             No exercises found
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-4 bg-slate-900/95 backdrop-blur border-t border-slate-800 safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-800 safe-bottom">
         <div className="flex gap-3">
           <button
             onClick={handleBack}
-            className="flex-1 py-3.5 px-4 rounded-xl font-medium text-sm transition-colors bg-slate-700 hover:bg-slate-600 text-slate-200"
+            className="flex-1 py-3.5 px-4 rounded-xl font-medium text-sm transition-colors bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200"
           >
             {currentBlockIndex === 0 ? 'Cancel' : 'Back'}
           </button>
           <button
             onClick={handleNext}
-            className="flex-1 py-3.5 px-4 rounded-xl font-medium text-sm transition-colors bg-slate-600 hover:bg-slate-500 text-slate-200"
+            className="flex-1 py-3.5 px-4 rounded-xl font-medium text-sm transition-colors bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200"
           >
             Skip
           </button>
@@ -467,52 +452,64 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
   );
 }
 
-// Draggable card for selected exercises
+// Reorderable card for selected exercises
 function DraggableExerciseCard({
   exercise,
-  isDragging,
-  isDragOver,
-  onDragStart,
-  onDragOver,
-  onDragEnd,
+  index,
+  total,
+  onMoveUp,
+  onMoveDown,
   onRemove,
   onSwap,
 }: {
   exercise: Exercise;
-  isDragging: boolean;
-  isDragOver: boolean;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
+  index: number;
+  total: number;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onRemove: () => void;
   onSwap?: () => void;
 }) {
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
-      onDrop={onDragEnd}
-      className={`w-full p-3 rounded-xl border text-left transition-all cursor-grab active:cursor-grabbing ${
-        isDragging
-          ? 'opacity-50 scale-95 bg-emerald-600/30 border-emerald-500'
-          : isDragOver
-          ? 'bg-emerald-600/40 border-emerald-400 scale-[1.02]'
-          : 'bg-emerald-600/20 border-emerald-600/50'
-      }`}
+      className="w-full p-3 rounded-xl border text-left transition-all bg-emerald-100 dark:bg-emerald-600/20 border-emerald-300 dark:border-emerald-600/50"
     >
-      <div className="flex items-center gap-3">
-        {/* Drag handle */}
-        <div className="text-emerald-400/60">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z" />
-          </svg>
+      <div className="flex items-center gap-2">
+        {/* Reorder buttons */}
+        <div className="flex flex-col -my-1">
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={index === 0}
+            className={`p-1 rounded transition-colors ${
+              index === 0
+                ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                : 'text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-90'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={index === total - 1}
+            className={`p-1 rounded transition-colors ${
+              index === total - 1
+                ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                : 'text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-90'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
 
-        <div className="flex-1">
-          <div className="font-medium text-emerald-100">{exercise.name}</div>
-          <div className="text-sm text-slate-400">
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-emerald-800 dark:text-emerald-100 truncate">{exercise.name}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 truncate">
             {exercise.equipment.charAt(0).toUpperCase() + exercise.equipment.slice(1)}
             {exercise.defaultWeight && ` • ${exercise.defaultWeight} lb`}
             {exercise.defaultReps && ` • ${exercise.defaultReps} reps`}
@@ -523,11 +520,12 @@ function DraggableExerciseCard({
         {/* Swap button */}
         {onSwap && (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onSwap();
             }}
-            className="p-2 text-slate-500 hover:text-amber-400 transition-colors"
+            className="p-2 text-slate-500 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
             title="Swap with similar"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -538,11 +536,12 @@ function DraggableExerciseCard({
 
         {/* Remove button */}
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
           }}
-          className="p-2 text-slate-500 hover:text-red-400 transition-colors"
+          className="p-2 text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -568,8 +567,8 @@ function ExerciseSelectCard({
       onClick={onToggle}
       className={`w-full p-3 rounded-xl border text-left transition-all active:scale-[0.98] ${
         selected
-          ? 'bg-emerald-600/20 border-emerald-600/50'
-          : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800'
+          ? 'bg-emerald-100 dark:bg-emerald-600/20 border-emerald-300 dark:border-emerald-600/50'
+          : 'bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
       }`}
     >
       <div className="flex items-center gap-3">
@@ -577,7 +576,7 @@ function ExerciseSelectCard({
           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
             selected
               ? 'border-emerald-500 bg-emerald-500'
-              : 'border-slate-600'
+              : 'border-slate-300 dark:border-slate-600'
           }`}
         >
           {selected && (
@@ -587,10 +586,10 @@ function ExerciseSelectCard({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className={`font-medium truncate ${selected ? 'text-emerald-100' : 'text-slate-100'}`}>
+          <div className={`font-medium truncate ${selected ? 'text-emerald-800 dark:text-emerald-100' : 'text-slate-800 dark:text-slate-100'}`}>
             {exercise.name}
           </div>
-          <div className="text-sm text-slate-400 truncate">
+          <div className="text-sm text-slate-500 dark:text-slate-400 truncate">
             {exercise.equipment.charAt(0).toUpperCase() + exercise.equipment.slice(1)}
             {exercise.defaultWeight && ` • ${exercise.defaultWeight} lb`}
             {exercise.defaultReps && ` • ${exercise.defaultReps} reps`}

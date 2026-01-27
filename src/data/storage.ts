@@ -100,42 +100,24 @@ const DEFAULT_FULL_BODY_WORKOUT: Omit<SavedWorkout, 'id' | 'createdAt' | 'update
       ],
     },
     {
-      id: 'squat-block',
+      id: 'strength-block',
       type: 'strength',
-      name: 'Squat',
+      name: 'Strength',
       exercises: [
+        // Set 1: Squat, Hinge, Press, Pull
         { exerciseId: 'goblet-squat', sets: 1, reps: 10 },
-        { exerciseId: 'goblet-squat', sets: 2, reps: 10 },
-        { exerciseId: 'goblet-squat', sets: 3, reps: 10 },
-      ],
-    },
-    {
-      id: 'hinge-block',
-      type: 'strength',
-      name: 'Hinge',
-      exercises: [
         { exerciseId: 'deadlift', sets: 1, reps: 10 },
-        { exerciseId: 'deadlift', sets: 2, reps: 10 },
-        { exerciseId: 'deadlift', sets: 3, reps: 10 },
-      ],
-    },
-    {
-      id: 'press-block',
-      type: 'strength',
-      name: 'Press',
-      exercises: [
         { exerciseId: 'overhead-press', sets: 1, reps: 8 },
-        { exerciseId: 'overhead-press', sets: 2, reps: 8 },
-        { exerciseId: 'overhead-press', sets: 3, reps: 8 },
-      ],
-    },
-    {
-      id: 'pull-block',
-      type: 'strength',
-      name: 'Pull',
-      exercises: [
         { exerciseId: 'rows', sets: 1, reps: 10 },
+        // Set 2: Squat, Hinge, Press, Pull
+        { exerciseId: 'goblet-squat', sets: 2, reps: 10 },
+        { exerciseId: 'deadlift', sets: 2, reps: 10 },
+        { exerciseId: 'overhead-press', sets: 2, reps: 8 },
         { exerciseId: 'rows', sets: 2, reps: 10 },
+        // Set 3: Squat, Hinge, Press, Pull
+        { exerciseId: 'goblet-squat', sets: 3, reps: 10 },
+        { exerciseId: 'deadlift', sets: 3, reps: 10 },
+        { exerciseId: 'overhead-press', sets: 3, reps: 8 },
         { exerciseId: 'rows', sets: 3, reps: 10 },
       ],
     },
