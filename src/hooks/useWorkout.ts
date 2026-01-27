@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { WorkoutSession, WorkoutTemplate, ExerciseLog, EffortLevel } from '../types';
+import type { WorkoutSession, WorkoutBlock, ExerciseLog, EffortLevel } from '../types';
 import { saveCurrentSession, loadCurrentSession, addCompletedSession } from '../data/storage';
+import { generateUUID } from '../utils/uuid';
 
 export function useWorkout() {
   const [session, setSession] = useState<WorkoutSession | null>(() => loadCurrentSession());
@@ -11,23 +12,11 @@ export function useWorkout() {
     saveCurrentSession(session);
   }, [session]);
 
-  const startWorkout = useCallback((template: WorkoutTemplate) => {
+  const startWorkoutWithBlocks = useCallback((blocks: WorkoutBlock[]) => {
     const newSession: WorkoutSession = {
-      id: crypto.randomUUID(),
-      templateId: template.id,
-      name: template.name,
-      startedAt: new Date().toISOString(),
-      exercises: [],
-    };
-    setSession(newSession);
-    setCurrentBlockIndex(0);
-    setCurrentExerciseIndex(0);
-  }, []);
-
-  const startQuickWorkout = useCallback((name: string) => {
-    const newSession: WorkoutSession = {
-      id: crypto.randomUUID(),
-      name,
+      id: generateUUID(),
+      name: 'Custom Workout',
+      blocks,
       startedAt: new Date().toISOString(),
       exercises: [],
     };
@@ -96,8 +85,7 @@ export function useWorkout() {
     session,
     currentBlockIndex,
     currentExerciseIndex,
-    startWorkout,
-    startQuickWorkout,
+    startWorkoutWithBlocks,
     logExercise,
     nextExercise,
     previousExercise,

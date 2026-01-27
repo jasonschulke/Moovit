@@ -36,9 +36,14 @@ html {
 }
 
 body {
-  @apply bg-slate-950 text-slate-100 min-h-screen;
+  @apply bg-slate-100 text-slate-900 min-h-screen;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode body styles */
+.dark body {
+  @apply bg-slate-950 text-slate-100;
 }
 
 /* Safe area for iPhone notch/dynamic island */
@@ -60,6 +65,20 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  @apply bg-slate-300;
   border-radius: 2px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  @apply bg-slate-700;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

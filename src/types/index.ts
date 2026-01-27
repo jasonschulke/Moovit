@@ -46,11 +46,18 @@ export interface WorkoutExercise {
   notes?: string;
 }
 
+export interface WorkoutSet {
+  id: string;
+  setNumber: number;
+  exercises: WorkoutExercise[];
+}
+
 export interface WorkoutBlock {
   id: string;
   type: BlockType;
   name: string;
-  exercises: WorkoutExercise[];
+  exercises: WorkoutExercise[]; // Flat list for backward compatibility
+  sets?: WorkoutSet[]; // Optional set-based structure
   repeat?: number; // number of times to repeat the block (for sets)
 }
 
@@ -58,6 +65,15 @@ export interface WorkoutTemplate {
   id: string;
   name: string;
   blocks: WorkoutBlock[];
+}
+
+export interface SavedWorkout {
+  id: string;
+  name: string;
+  estimatedMinutes?: number;
+  blocks: WorkoutBlock[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ExerciseLog {
@@ -74,6 +90,7 @@ export interface WorkoutSession {
   id: string;
   templateId?: string;
   name: string;
+  blocks: WorkoutBlock[];
   startedAt: string;
   completedAt?: string;
   exercises: ExerciseLog[];

@@ -1,6 +1,7 @@
 import type { Exercise } from '../types';
+import { loadCustomExercises } from './storage';
 
-export const exercises: Exercise[] = [
+export const defaultExercises: Exercise[] = [
   // Warmup exercises
   {
     id: 'jumping-jacks',
@@ -260,18 +261,29 @@ export const exercises: Exercise[] = [
   },
 ];
 
+// Combine default and custom exercises
+export function getAllExercises(): Exercise[] {
+  const custom = loadCustomExercises();
+  return [...defaultExercises, ...custom];
+}
+
+// Legacy export for compatibility - but returns a function call result
+// Components should call getAllExercises() for fresh data
+export const exercises = defaultExercises;
+
 export function getExerciseById(id: string): Exercise | undefined {
-  return exercises.find(e => e.id === id);
+  return getAllExercises().find(e => e.id === id);
 }
 
 export function getExercisesByArea(area: string): Exercise[] {
-  return exercises.filter(e => e.area === area);
+  return getAllExercises().filter(e => e.area === area);
 }
 
 export function getAlternatives(exerciseId: string): Exercise[] {
-  const exercise = getExerciseById(exerciseId);
+  const allExercises = getAllExercises();
+  const exercise = allExercises.find(e => e.id === exerciseId);
   if (!exercise?.alternatives) return [];
   return exercise.alternatives
-    .map(id => getExerciseById(id))
+    .map(id => allExercises.find(e => e.id === id))
     .filter((e): e is Exercise => e !== undefined);
 }
