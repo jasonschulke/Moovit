@@ -34,7 +34,7 @@ function App() {
 
   // Splash screen timeout
   useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 1500);
+    const timer = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -108,11 +108,10 @@ function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100">
         <img
-          src="/logo_icon_wordmark.png"
+          src="/logo_stacked.png"
           alt="Moove"
-          className="h-16 animate-pulse"
+          className="h-32 animate-pulse"
         />
-        <p className="mt-3 text-slate-500 text-sm font-medium tracking-wide">Moove your Bones</p>
       </div>
     );
   }
