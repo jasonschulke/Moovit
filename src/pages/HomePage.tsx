@@ -7,11 +7,11 @@ function getTimeBasedGreeting(name: string | null): string {
   const displayName = name || 'there';
 
   if (hour < 12) {
-    return `Mornin' ${displayName}`;
+    return `Mornin', ${displayName}.`;
   } else if (hour < 17) {
-    return `Afternoon, ${displayName}`;
+    return `Afternoon, ${displayName}.`;
   } else {
-    return `Evenin' ${displayName}`;
+    return `Evenin', ${displayName}.`;
   }
 }
 
@@ -172,6 +172,10 @@ export function HomePage() {
   }, [stats.workoutsByDay]);
 
   const handleRefresh = () => {
+    // Clear onboarding flag and user name to trigger onboarding again
+    // but keep all workout data intact
+    localStorage.removeItem('workout_onboarding_complete');
+    localStorage.removeItem('workout_user_name');
     window.location.reload();
   };
 

@@ -1,5 +1,6 @@
 import type { WorkoutSession, ExerciseLog, SavedWorkout, WorkoutBlock } from '../types';
 import { generateUUID } from '../utils/uuid';
+import { getDeviceId } from './sync';
 // Cloud sync disabled - was causing data sharing between users
 // import { scheduleSyncToCloud } from './sync';
 
@@ -16,6 +17,9 @@ const USER_NAME_KEY = 'workout_user_name';
 // User name
 export function saveUserName(name: string): void {
   localStorage.setItem(USER_NAME_KEY, name);
+  // Log user identity for analytics
+  const deviceId = getDeviceId();
+  console.log('[Moove] User identity:', { deviceId, userName: name, timestamp: new Date().toISOString() });
 }
 
 export function loadUserName(): string | null {

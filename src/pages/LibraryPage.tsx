@@ -48,29 +48,30 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
   const [addingToSet, setAddingToSet] = useState<number | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState('');
 
-  // Drag and drop state
-  const [draggedItem, setDraggedItem] = useState<{ blockIdx: number; exerciseIdx: number } | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<{ blockIdx: number; exerciseIdx: number } | null>(null);
-
-  // Swipe to delete state
+  // Swipe to delete state - use refs for smooth animation during swipe
   const [swipingExercise, setSwipingExercise] = useState<{ blockIdx: number; exerciseIdx: number } | null>(null);
-  const [swipeOffset, setSwipeOffset] = useState(0);
   const swipeStartX = useRef(0);
   const swipeStartY = useRef(0);
+  const swipeOffsetRef = useRef(0);
+  const swipeElementRef = useRef<HTMLDivElement | null>(null);
   const swipeThreshold = 80;
   const swipeActive = useRef(false);
 
-  // Swipe handlers
-  const handleTouchStart = (e: React.TouchEvent, blockIdx: number, exerciseIdx: number) => {
+  // Swipe handlers with direct DOM manipulation for 60fps animation
+  const handleTouchStart = (e: React.TouchEvent, blockIdx: number, exerciseIdx: number, element: HTMLDivElement | null) => {
     swipeStartX.current = e.touches[0].clientX;
     swipeStartY.current = e.touches[0].clientY;
+    swipeOffsetRef.current = 0;
+    swipeElementRef.current = element;
     setSwipingExercise({ blockIdx, exerciseIdx });
-    setSwipeOffset(0);
     swipeActive.current = false;
+    if (element) {
+      element.style.transition = 'none';
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!swipingExercise) return;
+    if (!swipingExercise || !swipeElementRef.current) return;
     const diffX = swipeStartX.current - e.touches[0].clientX;
     const diffY = Math.abs(e.touches[0].clientY - swipeStartY.current);
 
@@ -80,46 +81,46 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
     }
 
     if (swipeActive.current) {
-      setSwipeOffset(Math.max(0, Math.min(diffX, 120)));
+      const offset = Math.max(0, Math.min(diffX, 120));
+      swipeOffsetRef.current = offset;
+      // Direct DOM update - no React re-render
+      swipeElementRef.current.style.transform = `translateX(-${offset}px)`;
     }
   };
 
   const handleTouchEnd = () => {
     if (!swipingExercise) return;
-    if (swipeActive.current && swipeOffset >= swipeThreshold) {
-      removeExerciseFromBlock(swipingExercise.blockIdx, swipingExercise.exerciseIdx);
+    const element = swipeElementRef.current;
+    if (element) {
+      element.style.transition = 'transform 0.2s ease-out';
+      if (swipeActive.current && swipeOffsetRef.current >= swipeThreshold) {
+        element.style.transform = 'translateX(-100%)';
+        setTimeout(() => {
+          removeExerciseFromBlock(swipingExercise.blockIdx, swipingExercise.exerciseIdx);
+        }, 150);
+      } else {
+        element.style.transform = 'translateX(0)';
+      }
     }
     setSwipingExercise(null);
-    setSwipeOffset(0);
+    swipeOffsetRef.current = 0;
+    swipeElementRef.current = null;
     swipeActive.current = false;
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (blockIdx: number, exerciseIdx: number) => {
-    setDraggedItem({ blockIdx, exerciseIdx });
-  };
+  // Move exercise up or down within a block
+  const moveExercise = (blockIdx: number, fromIdx: number, direction: 'up' | 'down') => {
+    if (!savingBlocks) return;
+    const toIdx = direction === 'up' ? fromIdx - 1 : fromIdx + 1;
+    const block = savingBlocks[blockIdx];
+    if (toIdx < 0 || toIdx >= block.exercises.length) return;
 
-  const handleDragOver = (e: React.DragEvent, blockIdx: number, exerciseIdx: number) => {
-    e.preventDefault();
-    if (draggedItem && draggedItem.blockIdx === blockIdx) {
-      setDragOverItem({ blockIdx, exerciseIdx });
-    }
-  };
-
-  const handleDragEnd = () => {
-    if (draggedItem && dragOverItem && draggedItem.blockIdx === dragOverItem.blockIdx) {
-      if (draggedItem.exerciseIdx !== dragOverItem.exerciseIdx && savingBlocks) {
-        const newBlocks = [...savingBlocks];
-        const block = newBlocks[draggedItem.blockIdx];
-        const exercises = [...block.exercises];
-        const [removed] = exercises.splice(draggedItem.exerciseIdx, 1);
-        exercises.splice(dragOverItem.exerciseIdx, 0, removed);
-        newBlocks[draggedItem.blockIdx] = { ...block, exercises };
-        setSavingBlocks(newBlocks);
-      }
-    }
-    setDraggedItem(null);
-    setDragOverItem(null);
+    const newBlocks = [...savingBlocks];
+    const exercises = [...block.exercises];
+    const [removed] = exercises.splice(fromIdx, 1);
+    exercises.splice(toIdx, 0, removed);
+    newBlocks[blockIdx] = { ...block, exercises };
+    setSavingBlocks(newBlocks);
   };
 
   const exercises = useMemo(() => getAllExercises(), [customExercises]);
@@ -496,19 +497,17 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
 
                             {/* Exercise List */}
                             <div className="space-y-1">
-                          {exerciseItems.map(({ ex, originalIdx }) => {
+                          {exerciseItems.map(({ ex, originalIdx }, idx) => {
                             const exercise = getExerciseById(ex.exerciseId);
                             const areaLabel = exercise?.area ? exercise.area.charAt(0).toUpperCase() + exercise.area.slice(1) : '';
                             const areaColorClass = exercise?.area ? getAreaColor(exercise.area) : '';
-                            const isBeingDragged = draggedItem?.blockIdx === blockIdx && draggedItem?.exerciseIdx === originalIdx;
-                            const isDragOver = dragOverItem?.blockIdx === blockIdx && dragOverItem?.exerciseIdx === originalIdx;
-                            const isSwiping = swipingExercise?.blockIdx === blockIdx && swipingExercise?.exerciseIdx === originalIdx;
-                            const currentSwipeOffset = isSwiping ? swipeOffset : 0;
+                            const isFirst = idx === 0;
+                            const isLast = idx === exerciseItems.length - 1;
 
                             return (
                               <div
                                 key={originalIdx}
-                                className={`relative overflow-hidden rounded-lg ${isDragOver ? 'ring-2 ring-emerald-400' : ''}`}
+                                className="relative overflow-hidden rounded-lg"
                               >
                                 {/* Delete background */}
                                 <div className="absolute inset-y-0 right-0 w-24 bg-red-500 flex items-center justify-end pr-4">
@@ -519,17 +518,14 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
 
                                 {/* Exercise card */}
                                 <div
-                                  draggable
-                                  onDragStart={() => handleDragStart(blockIdx, originalIdx)}
-                                  onDragOver={(e) => handleDragOver(e, blockIdx, originalIdx)}
-                                  onDragEnd={handleDragEnd}
-                                  onTouchStart={(e) => handleTouchStart(e, blockIdx, originalIdx)}
+                                  ref={el => {
+                                    // Store ref for swipe animation
+                                  }}
+                                  onTouchStart={(e) => handleTouchStart(e, blockIdx, originalIdx, e.currentTarget)}
                                   onTouchMove={handleTouchMove}
                                   onTouchEnd={handleTouchEnd}
-                                  className={`relative flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm cursor-grab active:cursor-grabbing transition-all ${
-                                    isBeingDragged ? 'opacity-50 scale-95' : ''
-                                  }`}
-                                  style={{ transform: `translateX(-${currentSwipeOffset}px)` }}
+                                  className="relative flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
+                                  style={{ willChange: 'transform' }}
                                 >
                                   {/* Movement type badge - colored */}
                                   {areaLabel && (
@@ -560,11 +556,26 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
                                       </svg>
                                     </button>
                                   )}
-                                  {/* Drag handle - far right */}
-                                  <div className="shrink-0 text-slate-300 dark:text-slate-600">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                    </svg>
+                                  {/* Reorder buttons */}
+                                  <div className="shrink-0 flex flex-col -my-1">
+                                    <button
+                                      onClick={() => moveExercise(blockIdx, originalIdx, 'up')}
+                                      disabled={isFirst}
+                                      className={`p-0.5 rounded transition-colors ${isFirst ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-emerald-500 dark:text-slate-500 dark:hover:text-emerald-400 active:scale-90'}`}
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      onClick={() => moveExercise(blockIdx, originalIdx, 'down')}
+                                      disabled={isLast}
+                                      className={`p-0.5 rounded transition-colors ${isLast ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-emerald-500 dark:text-slate-500 dark:hover:text-emerald-400 active:scale-90'}`}
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                      </svg>
+                                    </button>
                                   </div>
                                 </div>
                               </div>

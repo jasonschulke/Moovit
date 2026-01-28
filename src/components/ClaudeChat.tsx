@@ -245,18 +245,22 @@ export function ClaudeChat() {
               I can help you add new exercises, answer fitness questions, or suggest workouts.
             </p>
             <div className="mt-6 space-y-2">
-              <button
-                onClick={() => setInput('Add a barbell back squat exercise')}
-                className="block w-full max-w-xs mx-auto px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
-              >
-                "Add a barbell back squat"
-              </button>
-              <button
-                onClick={() => setInput('What exercises target the posterior chain?')}
-                className="block w-full max-w-xs mx-auto px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
-              >
-                "What exercises target the posterior chain?"
-              </button>
+              {[
+                'Add a barbell back squat exercise',
+                'What exercises target the posterior chain?',
+                'Create a 20-minute HIIT workout',
+                'How do I improve my deadlift form?',
+                'Add a kettlebell turkish get-up',
+                'What\'s the best warm-up before lifting?',
+              ].map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => setInput(prompt)}
+                  className="block w-full max-w-xs mx-auto px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
+                >
+                  "{prompt}"
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -273,7 +277,13 @@ export function ClaudeChat() {
                   : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-bl-md'
               }`}
             >
-              <div className="whitespace-pre-wrap text-sm">{formatMessage(msg.content)}</div>
+              {msg.role === 'user' ? (
+                <div className="text-sm">{msg.content}</div>
+              ) : (
+                <div className="text-sm">
+                  <RichText content={msg.content} />
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -327,11 +337,164 @@ export function ClaudeChat() {
   );
 }
 
-// Format message to hide JSON blocks and show friendly version
-function formatMessage(content: string): string {
-  // Replace exercise JSON blocks with a friendly message
-  return content.replace(
+// Rich text component for markdown-like formatting
+function RichText({ content }: { content: string }) {
+  // First, replace exercise JSON blocks with a friendly message
+  const cleanedContent = content.replace(
     /```exercise\n[\s\S]*?\n```/g,
-    '[Exercise added to your library]'
+    '✅ **Exercise added to your library!**'
   );
+
+  // Parse and render markdown-like content
+  const elements: React.ReactNode[] = [];
+  const lines = cleanedContent.split('\n');
+  let inCodeBlock = false;
+  let codeBlockContent: string[] = [];
+
+  lines.forEach((line, lineIndex) => {
+    // Code block handling
+    if (line.startsWith('```')) {
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeBlockContent = [];
+      } else {
+        inCodeBlock = false;
+        elements.push(
+          <pre key={`code-${lineIndex}`} className="my-2 p-3 rounded-lg bg-slate-100 dark:bg-slate-900 overflow-x-auto text-xs font-mono">
+            <code>{codeBlockContent.join('\n')}</code>
+          </pre>
+        );
+      }
+      return;
+    }
+
+    if (inCodeBlock) {
+      codeBlockContent.push(line);
+      return;
+    }
+
+    // Empty line
+    if (!line.trim()) {
+      elements.push(<div key={`br-${lineIndex}`} className="h-2" />);
+      return;
+    }
+
+    // Headers
+    if (line.startsWith('### ')) {
+      elements.push(
+        <h4 key={lineIndex} className="font-semibold text-sm mt-2 mb-1">
+          {formatInlineText(line.slice(4))}
+        </h4>
+      );
+      return;
+    }
+    if (line.startsWith('## ')) {
+      elements.push(
+        <h3 key={lineIndex} className="font-semibold mt-2 mb-1">
+          {formatInlineText(line.slice(3))}
+        </h3>
+      );
+      return;
+    }
+    if (line.startsWith('# ')) {
+      elements.push(
+        <h2 key={lineIndex} className="font-bold text-base mt-2 mb-1">
+          {formatInlineText(line.slice(2))}
+        </h2>
+      );
+      return;
+    }
+
+    // Unordered lists
+    if (line.match(/^[\-\*]\s/)) {
+      elements.push(
+        <div key={lineIndex} className="flex gap-2 ml-2">
+          <span className="text-emerald-500">•</span>
+          <span>{formatInlineText(line.slice(2))}</span>
+        </div>
+      );
+      return;
+    }
+
+    // Numbered lists
+    const numberedMatch = line.match(/^(\d+)\.\s/);
+    if (numberedMatch) {
+      elements.push(
+        <div key={lineIndex} className="flex gap-2 ml-2">
+          <span className="text-emerald-500 font-medium">{numberedMatch[1]}.</span>
+          <span>{formatInlineText(line.slice(numberedMatch[0].length))}</span>
+        </div>
+      );
+      return;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={lineIndex}>{formatInlineText(line)}</p>
+    );
+  });
+
+  return <div className="space-y-1">{elements}</div>;
+}
+
+// Format inline text (bold, italic, code)
+function formatInlineText(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let keyIndex = 0;
+
+  while (remaining.length > 0) {
+    // Bold: **text**
+    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    // Italic: *text* or _text_
+    const italicMatch = remaining.match(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)|_(.+?)_/);
+    // Inline code: `code`
+    const codeMatch = remaining.match(/`([^`]+)`/);
+
+    // Find the earliest match
+    const matches = [
+      boldMatch ? { type: 'bold', match: boldMatch, index: boldMatch.index! } : null,
+      italicMatch ? { type: 'italic', match: italicMatch, index: italicMatch.index! } : null,
+      codeMatch ? { type: 'code', match: codeMatch, index: codeMatch.index! } : null,
+    ].filter(Boolean).sort((a, b) => a!.index - b!.index);
+
+    if (matches.length === 0) {
+      parts.push(remaining);
+      break;
+    }
+
+    const earliest = matches[0]!;
+
+    // Add text before the match
+    if (earliest.index > 0) {
+      parts.push(remaining.slice(0, earliest.index));
+    }
+
+    // Add the formatted element
+    if (earliest.type === 'bold') {
+      parts.push(
+        <strong key={`b-${keyIndex++}`} className="font-semibold">
+          {earliest.match[1]}
+        </strong>
+      );
+      remaining = remaining.slice(earliest.index + earliest.match[0].length);
+    } else if (earliest.type === 'italic') {
+      const content = earliest.match[1] || earliest.match[2];
+      parts.push(
+        <em key={`i-${keyIndex++}`} className="italic">
+          {content}
+        </em>
+      );
+      remaining = remaining.slice(earliest.index + earliest.match[0].length);
+    } else if (earliest.type === 'code') {
+      parts.push(
+        <code key={`c-${keyIndex++}`} className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-xs font-mono">
+          {earliest.match[1]}
+        </code>
+      );
+      remaining = remaining.slice(earliest.index + earliest.match[0].length);
+    }
+  }
+
+  return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : <>{parts}</>;
 }
