@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { saveUserName } from '../data/storage';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -34,11 +35,16 @@ const STEPS = [
 
 export function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState(0);
+  const [userName, setUserName] = useState('');
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
+  const isWelcomeStep = step === 0;
 
   const handleNext = () => {
     if (isLast) {
+      if (userName.trim()) {
+        saveUserName(userName.trim());
+      }
       onComplete();
     } else {
       setStep(step + 1);
@@ -46,6 +52,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const handleSkip = () => {
+    if (userName.trim()) {
+      saveUserName(userName.trim());
+    }
     onComplete();
   };
 
@@ -105,9 +114,22 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 text-center mb-3">
           {currentStep.title}
         </h2>
-        <p className="text-slate-600 dark:text-slate-400 text-center mb-8 max-w-sm mx-auto">
+        <p className="text-slate-600 dark:text-slate-400 text-center mb-6 max-w-sm mx-auto">
           {currentStep.description}
         </p>
+
+        {/* Name input on welcome step */}
+        {isWelcomeStep && (
+          <div className="mb-6">
+            <input
+              type="text"
+              placeholder="What's your first name?"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+        )}
 
         <div className="flex gap-3">
           {!isLast && (

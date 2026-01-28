@@ -82,3 +82,17 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Splash screen logo grow animation */
+@keyframes logo-grow {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.15);
+  }
+}
+
+.animate-logo-grow {
+  animation: logo-grow 2s ease-out forwards;
+}

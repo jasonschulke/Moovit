@@ -110,7 +110,7 @@ function App() {
         <img
           src="/logo_stacked.png"
           alt="Moove"
-          className="h-32 animate-pulse"
+          className="h-32 animate-logo-grow"
         />
         <p className="mt-4 text-slate-500 text-sm font-medium tracking-wide">Moove your Bones</p>
       </div>

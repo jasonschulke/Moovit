@@ -1,6 +1,19 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { getWorkoutStats, getThisWeekWorkoutDates, getYearlyContributions, loadRestDays, toggleYearDayStatus, hasWorkoutOnDate, hasRealWorkoutOnDate, addBacklogWorkout, getEffortHistory, backfillEffortScores } from '../data/storage';
+import { getWorkoutStats, getThisWeekWorkoutDates, getYearlyContributions, loadRestDays, toggleYearDayStatus, hasWorkoutOnDate, hasRealWorkoutOnDate, addBacklogWorkout, getEffortHistory, backfillEffortScores, loadUserName } from '../data/storage';
 import { EffortChart } from '../components/EffortChart';
+
+function getTimeBasedGreeting(name: string | null): string {
+  const hour = new Date().getHours();
+  const displayName = name || 'there';
+
+  if (hour < 12) {
+    return `Mornin' ${displayName}`;
+  } else if (hour < 17) {
+    return `Afternoon, ${displayName}`;
+  } else {
+    return `Evenin' ${displayName}`;
+  }
+}
 
 export function HomePage() {
   const [stats, setStats] = useState(() => getWorkoutStats());
@@ -8,6 +21,8 @@ export function HomePage() {
   const [yearlyData, setYearlyData] = useState(() => getYearlyContributions());
   const [restDays, setRestDays] = useState(() => loadRestDays());
   const [effortHistory, setEffortHistory] = useState(() => getEffortHistory());
+  const [userName] = useState(() => loadUserName());
+  const greeting = getTimeBasedGreeting(userName);
 
   useEffect(() => {
     // Add backlog workouts for specified dates (only if not already present)
@@ -167,9 +182,9 @@ export function HomePage() {
       {/* Header */}
       <header className="px-4 pt-16 pb-4 safe-top">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logo_icon.png" alt="Moove" className="h-10 dark:invert" />
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Home</h1>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{greeting}</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Ready to moove your bones?</p>
           </div>
           <div className="flex items-center gap-2">
             {/* Refresh button */}

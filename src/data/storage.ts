@@ -11,6 +11,16 @@ const CUSTOM_EXERCISES_KEY = 'custom_exercises';
 const CLAUDE_API_KEY = 'claude_api_key';
 const CHAT_HISTORY_KEY = 'claude_chat_history';
 const EQUIPMENT_CONFIG_KEY = 'equipment_config';
+const USER_NAME_KEY = 'workout_user_name';
+
+// User name
+export function saveUserName(name: string): void {
+  localStorage.setItem(USER_NAME_KEY, name);
+}
+
+export function loadUserName(): string | null {
+  return localStorage.getItem(USER_NAME_KEY);
+}
 
 export function saveSessions(sessions: WorkoutSession[]): void {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
