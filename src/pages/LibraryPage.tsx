@@ -523,9 +523,6 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
 
                                 {/* Exercise card */}
                                 <div
-                                  ref={el => {
-                                    // Store ref for swipe animation
-                                  }}
                                   onTouchStart={(e) => handleTouchStart(e, blockIdx, originalIdx, e.currentTarget)}
                                   onTouchMove={handleTouchMove}
                                   onTouchEnd={handleTouchEnd}
