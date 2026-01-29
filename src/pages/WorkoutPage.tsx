@@ -4,6 +4,7 @@ import { ExerciseView } from '../components/ExerciseView';
 import { EffortPicker } from '../components/EffortPicker';
 import { Button } from '../components/Button';
 import { CowCelebration } from '../components/CowCelebration';
+import { CardioWorkoutView } from '../components/CardioWorkoutView';
 import { getExerciseById, getAllExercises } from '../data/exercises';
 import { incrementSkipCount, incrementSwapCount } from '../data/storage';
 
@@ -26,7 +27,7 @@ interface WorkoutPageProps {
   }) => void;
   onNextExercise: (totalInBlock: number, totalBlocks: number) => void;
   onPreviousExercise: (getBlockExerciseCount: (index: number) => number) => void;
-  onCompleteWorkout: (effort?: EffortLevel) => void;
+  onCompleteWorkout: (effort?: EffortLevel, distance?: number) => void;
   onCancelWorkout: () => void;
   onStartWorkout: () => void;
   onUpdateSwappedExercises?: (swapped: Record<string, string>) => void;
@@ -246,6 +247,18 @@ export function WorkoutPage({
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Cardio workout - render CardioWorkoutView
+  if (session && session.cardioType) {
+    return (
+      <CardioWorkoutView
+        cardioType={session.cardioType}
+        startedAt={session.startedAt}
+        onComplete={onCompleteWorkout}
+        onCancel={onCancelWorkout}
+      />
+    );
+  }
 
   // No active workout
   if (!session || !session.blocks || session.blocks.length === 0) {

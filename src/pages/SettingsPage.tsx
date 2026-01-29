@@ -13,8 +13,12 @@ import {
   exportAllDataAsJSON,
   exportWorkoutsAsCSV,
   exportExerciseLogsAsCSV,
+  clearAllData,
 } from '../data/storage';
 import { getDeviceId } from '../data/sync';
+import { deleteAllCloudData } from '../data/supabaseSync';
+import { useAuth } from '../contexts/AuthContext';
+import { AuthModal } from '../components/AuthModal';
 import { Button } from '../components/Button';
 import type { Exercise, PersonalityType } from '../types';
 import { PERSONALITY_OPTIONS } from '../types';
@@ -33,7 +37,10 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
   const [personality, setPersonality] = useState<PersonalityType>('neutral');
   const [userName, setUserName] = useState<string>('');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const deviceId = getDeviceId();
+  const { user, syncStatus, signOut, isConfigured } = useAuth();
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -136,6 +143,82 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
       </header>
 
       <div className="px-4 space-y-6">
+        {/* ACCOUNT Section */}
+        {isConfigured && (
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">Account</h2>
+            <div className="space-y-4">
+              <section className="p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
+                {user ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-base font-medium text-slate-900 dark:text-slate-100">Signed in</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Sync status indicator */}
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+                          syncStatus === 'synced' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          syncStatus === 'syncing' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          syncStatus === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                          syncStatus === 'offline' ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400' :
+                          'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                        }`}>
+                          {syncStatus === 'syncing' && (
+                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                          )}
+                          {syncStatus === 'synced' && (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          {syncStatus === 'error' && (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                          )}
+                          <span className="capitalize">{syncStatus}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Your workouts sync automatically across all your devices.
+                    </p>
+                    <Button variant="ghost" onClick={signOut} className="w-full">
+                      Sign Out
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-base font-medium text-slate-900 dark:text-slate-100">Sync Across Devices</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Sign in to sync your workouts, exercises, and preferences across all your devices.
+                      </p>
+                    </div>
+                    <Button variant="primary" onClick={() => setShowAuthModal(true)} className="w-full">
+                      <div className="flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Sign in with Email
+                      </div>
+                    </Button>
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
+        )}
+
+        {/* MY PREFERENCES Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">My Preferences</h2>
+          <div className="space-y-4">
         {/* Profile Section */}
         <section className="p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-1">Profile</h2>
@@ -201,25 +284,212 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
             Choose how the app talks to you.
           </p>
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
             {PERSONALITY_OPTIONS.map(option => (
               <button
                 key={option.value}
                 onClick={() => handlePersonalityChange(option.value)}
-                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                className={`p-3 rounded-lg border-2 transition-all text-left min-h-[80px] flex flex-col ${
                   personality === option.value
                     ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
                     : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
               >
-                <div className={`font-medium ${personality === option.value ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                <div className={`font-medium text-sm ${personality === option.value ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
                   {option.label}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
                   {option.description}
                 </div>
               </button>
             ))}
+          </div>
+        </section>
+          </div>
+        </div>
+
+        {/* MY DATA Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">My Data</h2>
+          <div className="space-y-4">
+        {/* Custom Exercises Section - Collapsible */}
+        <section className="rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden">
+          <button
+            onClick={() => toggleSection('customExercises')}
+            className="w-full p-4 flex items-center justify-between text-left"
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Custom Exercises</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {customExercises.length > 0 ? `${customExercises.length} exercise${customExercises.length !== 1 ? 's' : ''} added` : 'None added yet'}
+              </p>
+            </div>
+            <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedSections.has('customExercises') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {expandedSections.has('customExercises') && (
+            <div className="px-4 pb-4">
+              {customExercises.length === 0 ? (
+                <div className="text-center py-4 text-slate-500 text-sm">
+                  No custom exercises yet. Ask Coach to add some!
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {customExercises.map(exercise => (
+                    <div
+                      key={exercise.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-700/50"
+                    >
+                      <div>
+                        <div className="font-medium text-slate-800 dark:text-slate-200">{exercise.name}</div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                          {exercise.area} • {exercise.equipment}
+                        </div>
+                      </div>
+                      {showDeleteConfirm === exercise.id ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleDeleteExercise(exercise.id)}
+                            className="px-3 py-1 rounded bg-red-500 text-white text-sm"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(null)}
+                            className="px-3 py-1 rounded bg-slate-300 dark:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowDeleteConfirm(exercise.id)}
+                          className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 p-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Chat History Section - Collapsible */}
+        <section className="rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden">
+          <button
+            onClick={() => toggleSection('chatHistory')}
+            className="w-full p-4 flex items-center justify-between text-left"
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Chat History</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Clear conversation history</p>
+            </div>
+            <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedSections.has('chatHistory') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {expandedSections.has('chatHistory') && (
+            <div className="px-4 pb-4">
+              <Button variant="ghost" onClick={handleClearChat} className="w-full">
+                Clear Chat History
+              </Button>
+            </div>
+          )}
+        </section>
+
+        {/* Manage Data - Collapsible */}
+        <section className="rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden">
+          <button
+            onClick={() => toggleSection('exportData')}
+            className="w-full p-4 flex items-center justify-between text-left"
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Manage Data</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Export or delete your data</p>
+            </div>
+            <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedSections.has('exportData') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {expandedSections.has('exportData') && (
+            <div className="px-4 pb-4 space-y-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Download your workout history</p>
+              <Button variant="secondary" onClick={handleExportJSON} className="w-full">
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export All Data (JSON)
+                </div>
+              </Button>
+              <Button variant="secondary" onClick={handleExportWorkoutsCSV} className="w-full">
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export Workouts (CSV)
+                </div>
+              </Button>
+              <Button variant="secondary" onClick={handleExportExerciseLogsCSV} className="w-full">
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export Exercise Logs (CSV)
+                </div>
+              </Button>
+
+              <div className="border-t border-slate-200 dark:border-slate-700 mt-4 pt-4">
+                <p className="text-xs text-red-500 dark:text-red-400 mb-3">Danger zone</p>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowDeleteAllConfirm(true)}
+                  className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete All Data
+                  </div>
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
+          </div>
+        </div>
+
+        {/* SYSTEM INFO Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">System Info</h2>
+          <div className="space-y-4">
+        {/* Refresh App Section */}
+        <section className="p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Refresh App</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Re-runs onboarding. Keeps your workout data.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                localStorage.removeItem('workout_onboarding_complete');
+                localStorage.removeItem('workout_user_name');
+                window.location.reload();
+              }}
+              className="px-4 py-2 text-sm"
+            >
+              Refresh
+            </Button>
           </div>
         </section>
 
@@ -232,7 +502,7 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Claude API Key</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {savedKey ? 'API key configured' : 'Required for Claude assistant'}
+                {savedKey ? 'API key configured' : 'Required for Coach assistant'}
               </p>
             </div>
             <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedSections.has('apiKey') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,127 +570,50 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
           )}
         </section>
 
-        {/* Custom Exercises Section */}
-        <section className="p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-1">Custom Exercises</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            Exercises you've added via the Claude assistant.
-          </p>
+        {/* Auth Modal */}
+        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
 
-          {customExercises.length === 0 ? (
-            <div className="text-center py-6 text-slate-500">
-              No custom exercises yet. Use the Claude assistant to add some!
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {customExercises.map(exercise => (
-                <div
-                  key={exercise.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-700/50"
+        {/* Delete All Data Confirmation Modal */}
+        {showDeleteAllConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                Delete All Data?
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                This will permanently delete all your workouts, exercises, and settings. This action cannot be undone.
+              </p>
+              {user && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mb-4 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  This will also delete your data from the cloud. Your account will remain active.
+                </p>
+              )}
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowDeleteAllConfirm(false)}
+                  className="flex-1"
                 >
-                  <div>
-                    <div className="font-medium text-slate-800 dark:text-slate-200">{exercise.name}</div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400">
-                      {exercise.area} • {exercise.equipment}
-                    </div>
-                  </div>
-                  {showDeleteConfirm === exercise.id ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleDeleteExercise(exercise.id)}
-                        className="px-3 py-1 rounded bg-red-500 text-white text-sm"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => setShowDeleteConfirm(null)}
-                        className="px-3 py-1 rounded bg-slate-300 dark:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowDeleteConfirm(exercise.id)}
-                      className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 p-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              ))}
+                  Cancel
+                </Button>
+                <button
+                  onClick={async () => {
+                    // Delete from cloud if user is signed in
+                    if (user) {
+                      await deleteAllCloudData(user.id);
+                    }
+                    // Delete from localStorage
+                    clearAllData();
+                    window.location.reload();
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium transition-colors"
+                >
+                  Delete Everything
+                </button>
+              </div>
             </div>
-          )}
-        </section>
-
-        {/* Chat History Section - Collapsible */}
-        <section className="rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden">
-          <button
-            onClick={() => toggleSection('chatHistory')}
-            className="w-full p-4 flex items-center justify-between text-left"
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Chat History</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Clear conversation history</p>
-            </div>
-            <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedSections.has('chatHistory') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {expandedSections.has('chatHistory') && (
-            <div className="px-4 pb-4">
-              <Button variant="ghost" onClick={handleClearChat} className="w-full">
-                Clear Chat History
-              </Button>
-            </div>
-          )}
-        </section>
-
-        {/* Data Export - Collapsible */}
-        <section className="rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden">
-          <button
-            onClick={() => toggleSection('exportData')}
-            className="w-full p-4 flex items-center justify-between text-left"
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Export Data</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Download workout data</p>
-            </div>
-            <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedSections.has('exportData') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {expandedSections.has('exportData') && (
-            <div className="px-4 pb-4 space-y-2">
-              <Button variant="secondary" onClick={handleExportJSON} className="w-full">
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Export All Data (JSON)
-                </div>
-              </Button>
-              <Button variant="secondary" onClick={handleExportWorkoutsCSV} className="w-full">
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Export Workouts (CSV)
-                </div>
-              </Button>
-              <Button variant="secondary" onClick={handleExportExerciseLogsCSV} className="w-full">
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Export Exercise Logs (CSV)
-                </div>
-              </Button>
-            </div>
-          )}
-        </section>
+          </div>
+        )}
 
         {/* App Info - Collapsible */}
         <section className="rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden">
@@ -453,6 +646,8 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
             </div>
           )}
         </section>
+          </div>
+        </div>
       </div>
     </div>
   );

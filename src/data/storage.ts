@@ -8,8 +8,17 @@
 import type { WorkoutSession, ExerciseLog, SavedWorkout, WorkoutBlock } from '../types';
 import { generateUUID } from '../utils/uuid';
 import { getDeviceId } from './sync';
-// Cloud sync disabled - was causing data sharing between users
-// import { scheduleSyncToCloud } from './sync';
+import { supabase } from '../lib/supabase';
+import { scheduleSyncToCloud } from './supabaseSync';
+
+// Helper to trigger sync if user is logged in
+async function triggerSyncIfLoggedIn() {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    scheduleSyncToCloud(user.id);
+  }
+}
 
 // ============================================================================
 // STORAGE KEYS
@@ -30,6 +39,18 @@ const SKIP_COUNTS_KEY = 'workout_skip_counts';     // Skip/swap tracking
 const CUSTOM_DESCRIPTIONS_KEY = 'workout_custom_descriptions'; // User exercise notes
 
 // ============================================================================
+// DATE UTILITIES
+// ============================================================================
+
+/** Format a date as YYYY-MM-DD in local timezone (not UTC) */
+export function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// ============================================================================
 // USER PROFILE
 // ============================================================================
 
@@ -38,6 +59,7 @@ export function saveUserName(name: string): void {
   // Log user identity for analytics
   const deviceId = getDeviceId();
   console.log('[Moove] User identity:', { deviceId, userName: name, timestamp: new Date().toISOString() });
+  triggerSyncIfLoggedIn();
 }
 
 export function loadUserName(): string | null {
@@ -50,6 +72,7 @@ export function loadUserName(): string | null {
 
 export function saveSessions(sessions: WorkoutSession[]): void {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+  triggerSyncIfLoggedIn();
 }
 
 export function loadSessions(): WorkoutSession[] {
@@ -90,6 +113,7 @@ export function loadSavedWorkouts(): SavedWorkout[] {
 
 export function saveSavedWorkouts(workouts: SavedWorkout[]): void {
   localStorage.setItem(SAVED_WORKOUTS_KEY, JSON.stringify(workouts));
+  triggerSyncIfLoggedIn();
 }
 
 export function addSavedWorkout(workout: Omit<SavedWorkout, 'id' | 'createdAt' | 'updatedAt'>): SavedWorkout {
@@ -256,25 +280,38 @@ export function getThisWeekWorkoutDates(): Set<string> {
   return dates;
 }
 
+/** Workout type info for calendar display */
+export interface DayWorkoutInfo {
+  count: number;
+  hasCardio: boolean;
+  hasStrength: boolean;
+}
+
 // Get yearly contribution data (GitHub-style grid)
-export function getYearlyContributions(): Map<string, number> {
+export function getYearlyContributions(): Map<string, DayWorkoutInfo> {
   const sessions = loadSessions().filter(s => s.completedAt);
-  const contributions = new Map<string, number>();
+  const contributions = new Map<string, DayWorkoutInfo>();
 
   // Get dates for the last 365 days
   const now = new Date();
   for (let i = 364; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    contributions.set(dateStr, 0);
+    const dateStr = formatLocalDate(date);
+    contributions.set(dateStr, { count: 0, hasCardio: false, hasStrength: false });
   }
 
-  // Count workouts per day
+  // Count workouts per day and track type
   sessions.forEach(s => {
-    const dateStr = new Date(s.startedAt).toISOString().split('T')[0];
+    const dateStr = formatLocalDate(new Date(s.startedAt));
     if (contributions.has(dateStr)) {
-      contributions.set(dateStr, (contributions.get(dateStr) || 0) + 1);
+      const current = contributions.get(dateStr)!;
+      current.count++;
+      if (s.cardioType) {
+        current.hasCardio = true;
+      } else if (s.exercises.length > 0) {
+        current.hasStrength = true;
+      }
     }
   });
 
@@ -372,6 +409,7 @@ export function loadRestDays(): Set<string> {
 
 export function saveRestDays(dates: Set<string>): void {
   localStorage.setItem(REST_DAYS_KEY, JSON.stringify([...dates]));
+  triggerSyncIfLoggedIn();
 }
 
 export function toggleRestDay(dateStr: string): boolean {
@@ -404,6 +442,7 @@ export function loadCustomExercises(): Exercise[] {
 
 export function saveCustomExercises(exercises: Exercise[]): void {
   localStorage.setItem(CUSTOM_EXERCISES_KEY, JSON.stringify(exercises));
+  triggerSyncIfLoggedIn();
 }
 
 export function addCustomExercise(exercise: Omit<Exercise, 'id'>): Exercise {
@@ -461,6 +500,7 @@ export function saveChatHistory(messages: ChatMessage[]): void {
   // Keep only last 50 messages to save space
   const trimmed = messages.slice(-50);
   localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(trimmed));
+  triggerSyncIfLoggedIn();
 }
 
 export function clearChatHistory(): void {
@@ -494,7 +534,7 @@ export function addBacklogWorkout(dateStr: string): WorkoutSession {
 export function removeWorkoutOnDate(dateStr: string): void {
   const sessions = loadSessions();
   const filtered = sessions.filter(s => {
-    const sessionDate = new Date(s.startedAt).toISOString().split('T')[0];
+    const sessionDate = formatLocalDate(new Date(s.startedAt));
     return sessionDate !== dateStr;
   });
   saveSessions(filtered);
@@ -503,7 +543,7 @@ export function removeWorkoutOnDate(dateStr: string): void {
 export function hasWorkoutOnDate(dateStr: string): boolean {
   const sessions = loadSessions().filter(s => s.completedAt);
   return sessions.some(s => {
-    const sessionDate = new Date(s.startedAt).toISOString().split('T')[0];
+    const sessionDate = formatLocalDate(new Date(s.startedAt));
     return sessionDate === dateStr;
   });
 }
@@ -512,9 +552,9 @@ export function hasWorkoutOnDate(dateStr: string): boolean {
 export function hasRealWorkoutOnDate(dateStr: string): boolean {
   const sessions = loadSessions().filter(s => s.completedAt);
   return sessions.some(s => {
-    const sessionDate = new Date(s.startedAt).toISOString().split('T')[0];
-    // Real workouts have exercises logged, backlog workouts are empty
-    return sessionDate === dateStr && s.exercises.length > 0;
+    const sessionDate = formatLocalDate(new Date(s.startedAt));
+    // Real workouts have exercises logged OR are cardio workouts; backlog workouts are empty
+    return sessionDate === dateStr && (s.exercises.length > 0 || s.cardioType);
   });
 }
 
@@ -614,6 +654,7 @@ export function loadEquipmentConfig(): EquipmentConfig {
 
 export function saveEquipmentConfig(config: EquipmentConfig): void {
   localStorage.setItem(EQUIPMENT_CONFIG_KEY, JSON.stringify(config));
+  triggerSyncIfLoggedIn();
 }
 
 export function getDefaultWeightForEquipment(equipmentType: EquipmentType): number | undefined {
@@ -647,6 +688,7 @@ export function loadPersonality(): PersonalityType {
 
 export function savePersonality(personality: PersonalityType): void {
   localStorage.setItem(PERSONALITY_KEY, personality);
+  triggerSyncIfLoggedIn();
 }
 
 // ============================================================================
@@ -665,6 +707,7 @@ export function loadFavorites(): FavoritesData {
 
 export function saveFavorites(favorites: FavoritesData): void {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  triggerSyncIfLoggedIn();
 }
 
 export function toggleFavoriteWorkout(workoutId: string): boolean {
@@ -718,6 +761,7 @@ export function loadSkipCounts(): SkipCounts {
 
 export function saveSkipCounts(counts: SkipCounts): void {
   localStorage.setItem(SKIP_COUNTS_KEY, JSON.stringify(counts));
+  triggerSyncIfLoggedIn();
 }
 
 export function incrementSkipCount(exerciseId: string): void {
@@ -750,7 +794,7 @@ export function getMostSkippedExercises(limit = 5): { exerciseId: string; skips:
 export function getSessionsByDate(dateStr: string): WorkoutSession[] {
   const sessions = loadSessions().filter(s => s.completedAt);
   return sessions.filter(s => {
-    const sessionDate = new Date(s.startedAt).toISOString().split('T')[0];
+    const sessionDate = formatLocalDate(new Date(s.startedAt));
     return sessionDate === dateStr;
   });
 }
@@ -813,6 +857,7 @@ export function loadCustomDescriptions(): CustomDescriptions {
 
 export function saveCustomDescriptions(descriptions: CustomDescriptions): void {
   localStorage.setItem(CUSTOM_DESCRIPTIONS_KEY, JSON.stringify(descriptions));
+  triggerSyncIfLoggedIn();
 }
 
 export function setExerciseDescription(exerciseId: string, description: string): void {
@@ -898,4 +943,31 @@ export function exportExerciseLogsAsCSV(): string {
   });
 
   return lines.join('\n');
+}
+
+// ============================================================================
+// DATA MANAGEMENT
+// ============================================================================
+
+/** Clear all app data from localStorage */
+export function clearAllData(): void {
+  const keysToRemove = [
+    SESSIONS_KEY,
+    CURRENT_SESSION_KEY,
+    SAVED_WORKOUTS_KEY,
+    REST_DAYS_KEY,
+    CUSTOM_EXERCISES_KEY,
+    CLAUDE_API_KEY,
+    CHAT_HISTORY_KEY,
+    EQUIPMENT_CONFIG_KEY,
+    USER_NAME_KEY,
+    PERSONALITY_KEY,
+    FAVORITES_KEY,
+    SKIP_COUNTS_KEY,
+    CUSTOM_DESCRIPTIONS_KEY,
+    'workout_onboarding_complete',
+    'workout_theme',
+  ];
+
+  keysToRemove.forEach(key => localStorage.removeItem(key));
 }

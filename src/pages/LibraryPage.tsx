@@ -1,7 +1,9 @@
 import { useState, useMemo, useRef } from 'react';
 import type { SavedWorkout, WorkoutBlock, Exercise, MuscleArea, WorkoutSession } from '../types';
+import { CARDIO_TYPE_LABELS, CARDIO_TYPE_ICONS } from '../types';
 import { loadSavedWorkouts, deleteSavedWorkout, addSavedWorkout, updateSavedWorkout, loadCustomExercises, deleteCustomExercise, getLastWeekAverages, loadFavorites, toggleFavoriteWorkout, toggleFavoriteExercise, getExerciseDescription, setExerciseDescription, clearExerciseDescription, loadSessions, deleteSession } from '../data/storage';
 import { getAllExercises, getExerciseById } from '../data/exercises';
+import { useSignUpPrompt } from '../contexts/SignUpPromptContext';
 import { Button } from '../components/Button';
 import { WorkoutBuilder } from '../components/WorkoutBuilder';
 
@@ -26,6 +28,7 @@ const AREA_FILTERS: { value: MuscleArea | 'all' | 'favorites'; label: string }[]
 ];
 
 export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
+  const { triggerSignUpPrompt } = useSignUpPrompt();
   const [activeTab, setActiveTab] = useState<TabType>('workouts');
 
   // Workouts state
@@ -415,6 +418,11 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
       setEditingWorkout(null);
       setWorkoutName('');
       setEstimatedMinutes('');
+
+      // Prompt anonymous users to sign up after saving a workout (only for new workouts)
+      if (!editingWorkout) {
+        triggerSignUpPrompt('save-workout');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -1218,10 +1226,23 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
                 )}
               </div>
 
-              <div className="flex items-center gap-3 mb-4">
-                <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium">
-                  {selectedSession.exercises.length} exercises
-                </span>
+              <div className="flex items-center gap-3 mb-4 flex-wrap">
+                {selectedSession.cardioType ? (
+                  <>
+                    <span className="px-2.5 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 text-sm font-medium">
+                      {CARDIO_TYPE_ICONS[selectedSession.cardioType]} {CARDIO_TYPE_LABELS[selectedSession.cardioType]}
+                    </span>
+                    {selectedSession.distance && (
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
+                        {selectedSession.distance} miles
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium">
+                    {selectedSession.exercises.length} exercises
+                  </span>
+                )}
                 {selectedSession.totalDuration && (
                   <span className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-sm font-medium">
                     {Math.round(selectedSession.totalDuration / 60)} min
@@ -1229,8 +1250,8 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
                 )}
               </div>
 
-              {/* Repeat workout button */}
-              {selectedSession.blocks && selectedSession.blocks.length > 0 && (
+              {/* Repeat workout button - only for block-based workouts */}
+              {selectedSession.blocks && selectedSession.blocks.length > 0 && !selectedSession.cardioType && (
                 <Button
                   variant="primary"
                   onClick={() => onStartWorkout(selectedSession.blocks)}
@@ -1376,9 +1397,22 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
                             </svg>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
-                              {session.exercises.length} exercises
-                            </span>
+                            {session.cardioType ? (
+                              <>
+                                <span className="px-2.5 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 text-sm font-medium">
+                                  {CARDIO_TYPE_ICONS[session.cardioType]} {CARDIO_TYPE_LABELS[session.cardioType]}
+                                </span>
+                                {session.distance && (
+                                  <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
+                                    {session.distance} mi
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
+                                {session.exercises.length} exercises
+                              </span>
+                            )}
                             {session.totalDuration && (
                               <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium">
                                 {Math.round(session.totalDuration / 60)} min
@@ -1414,9 +1448,12 @@ function ExerciseCard({ exercise, onClick, isFavorite, onToggleFavorite }: {
   const equipmentLabel = exercise.equipment.charAt(0).toUpperCase() + exercise.equipment.slice(1).replace('-', ' ');
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="w-full p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors active:scale-[0.98]"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+      className="w-full p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors active:scale-[0.98] cursor-pointer"
     >
       <div className="flex justify-between items-center">
         <div className="flex-1 min-w-0">
@@ -1424,7 +1461,7 @@ function ExerciseCard({ exercise, onClick, isFavorite, onToggleFavorite }: {
             <span className="font-medium text-slate-900 dark:text-slate-100">{exercise.name}</span>
             {onToggleFavorite && (
               <button
-                onClick={onToggleFavorite}
+                onClick={(e) => { e.stopPropagation(); onToggleFavorite(e); }}
                 className={`p-0.5 rounded-full transition-colors ${
                   isFavorite
                     ? 'text-pink-500 hover:text-pink-600'
@@ -1467,7 +1504,7 @@ function ExerciseCard({ exercise, onClick, isFavorite, onToggleFavorite }: {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </div>
-    </button>
+    </div>
   );
 }
 

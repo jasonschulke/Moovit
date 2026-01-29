@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import type { WorkoutBlock, SavedWorkout } from '../types';
+import type { WorkoutBlock, SavedWorkout, CardioType } from '../types';
+import { CARDIO_TYPE_LABELS, CARDIO_TYPE_ICONS } from '../types';
 import { getLastWorkout, loadSavedWorkouts } from '../data/storage';
 
 interface WorkoutStartFlowProps {
   onStartLastWorkout: (blocks: WorkoutBlock[]) => void;
   onCreateNew: () => void;
   onStartSavedWorkout: (workout: SavedWorkout) => void;
+  onStartCardio: (type: CardioType) => void;
   onManageLibrary: () => void;
 }
 
@@ -13,6 +15,7 @@ export function WorkoutStartFlow({
   onStartLastWorkout,
   onCreateNew,
   onStartSavedWorkout,
+  onStartCardio,
   onManageLibrary,
 }: WorkoutStartFlowProps) {
   const lastWorkout = useMemo(() => getLastWorkout(), []);
@@ -46,7 +49,7 @@ export function WorkoutStartFlow({
       </header>
 
       {/* Hero Start Button */}
-      <div className="px-4 mb-10">
+      <div className="px-4 mb-6">
         <button
           onClick={onCreateNew}
           className="w-full py-6 transition-all active:scale-[0.98]"
@@ -63,6 +66,23 @@ export function WorkoutStartFlow({
             </div>
           </div>
         </button>
+      </div>
+
+      {/* Timed Cardio */}
+      <div className="px-4 mb-8">
+        <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Timed Cardio</h2>
+        <div className="grid grid-cols-4 gap-2">
+          {(['walk', 'run', 'trail-run', 'hike'] as CardioType[]).map((type) => (
+            <button
+              key={type}
+              onClick={() => onStartCardio(type)}
+              className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all active:scale-[0.97]"
+            >
+              <span className="text-2xl">{CARDIO_TYPE_ICONS[type]}</span>
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{CARDIO_TYPE_LABELS[type]}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Quick Actions */}

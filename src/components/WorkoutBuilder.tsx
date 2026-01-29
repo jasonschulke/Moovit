@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import type { BlockType, WorkoutExercise, WorkoutBlock, MuscleArea, EquipmentType } from '../types';
 import { getAllExercises, getExerciseById } from '../data/exercises';
 import { addCustomExercise } from '../data/storage';
+import { useSignUpPrompt } from '../contexts/SignUpPromptContext';
 import { Button } from './Button';
 
 interface WorkoutBuilderProps {
@@ -78,6 +79,8 @@ const getAreaColor = (area: string) => {
 };
 
 export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
+  const { triggerSignUpPrompt } = useSignUpPrompt();
+
   // Store exercises per block: { blockType: { setNum: exerciseId[] } }
   const [blockExercises, setBlockExercises] = useState<Record<BlockType, Record<number, string[]>>>({
     warmup: { 1: [] },
@@ -238,6 +241,9 @@ export function WorkoutBuilder({ onStart, onCancel }: WorkoutBuilderProps) {
     setShowCreateExercise(false);
     setCreateForBlock(null);
     setCreateForSet(null);
+
+    // Prompt anonymous users to sign up after creating a custom exercise
+    triggerSignUpPrompt('exercise');
   };
 
   // Get filtered exercises for adding

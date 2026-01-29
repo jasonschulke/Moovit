@@ -34,6 +34,25 @@ export type MuscleArea =
 /** Workout block types for structuring sessions */
 export type BlockType = 'warmup' | 'strength' | 'conditioning' | 'cooldown';
 
+/** Cardio workout types (no blocks/sets needed) */
+export type CardioType = 'walk' | 'run' | 'trail-run' | 'hike';
+
+/** Labels for cardio types */
+export const CARDIO_TYPE_LABELS: Record<CardioType, string> = {
+  'walk': 'Walk',
+  'run': 'Run',
+  'trail-run': 'Trail Run',
+  'hike': 'Hike',
+};
+
+/** Icons/emoji for cardio types */
+export const CARDIO_TYPE_ICONS: Record<CardioType, string> = {
+  'walk': '🚶',
+  'run': '🏃',
+  'trail-run': '⛰️',
+  'hike': '🥾',
+};
+
 /** Rate of Perceived Exertion (RPE) scale 1-10 */
 export type EffortLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -101,6 +120,8 @@ export interface SavedWorkout {
   blocks: WorkoutBlock[];
   createdAt: string;
   updatedAt: string;
+  // Cardio-specific fields (if cardioType is set, blocks should be empty)
+  cardioType?: CardioType;
 }
 
 // ============================================================================
@@ -129,6 +150,9 @@ export interface WorkoutSession {
   exercises: ExerciseLog[];
   totalDuration?: number;        // Duration in seconds
   overallEffort?: EffortLevel;
+  // Cardio-specific fields
+  cardioType?: CardioType;       // If set, this is a cardio workout
+  distance?: number;             // Distance in miles
 }
 
 /** State for tracking position within an active workout */

@@ -6,7 +6,8 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import type { WorkoutSession, WorkoutBlock, ExerciseLog, EffortLevel } from '../types';
+import type { WorkoutSession, WorkoutBlock, ExerciseLog, EffortLevel, CardioType } from '../types';
+import { CARDIO_TYPE_LABELS } from '../types';
 import { saveCurrentSession, loadCurrentSession, addCompletedSession } from '../data/storage';
 import { generateUUID } from '../utils/uuid';
 
@@ -58,6 +59,20 @@ export function useWorkout() {
     setCurrentExerciseIndex(0);
   }, []);
 
+  const startCardioWorkout = useCallback((cardioType: CardioType) => {
+    const newSession: WorkoutSession = {
+      id: generateUUID(),
+      name: CARDIO_TYPE_LABELS[cardioType],
+      blocks: [],
+      startedAt: new Date().toISOString(),
+      exercises: [],
+      cardioType,
+    };
+    setSession(newSession);
+    setCurrentBlockIndex(0);
+    setCurrentExerciseIndex(0);
+  }, []);
+
   const logExercise = useCallback((log: Omit<ExerciseLog, 'completedAt'>) => {
     if (!session) return;
 
@@ -91,7 +106,7 @@ export function useWorkout() {
     }
   }, [currentBlockIndex, currentExerciseIndex]);
 
-  const completeWorkout = useCallback((overallEffort?: EffortLevel) => {
+  const completeWorkout = useCallback((overallEffort?: EffortLevel, distance?: number) => {
     if (!session) return;
 
     const completedSession: WorkoutSession = {
@@ -99,6 +114,7 @@ export function useWorkout() {
       completedAt: new Date().toISOString(),
       totalDuration: Math.round((Date.now() - new Date(session.startedAt).getTime()) / 1000),
       overallEffort,
+      distance,
     };
 
     addCompletedSession(completedSession);
@@ -135,6 +151,7 @@ export function useWorkout() {
     currentBlockIndex,
     currentExerciseIndex,
     startWorkoutWithBlocks,
+    startCardioWorkout,
     logExercise,
     nextExercise,
     previousExercise,

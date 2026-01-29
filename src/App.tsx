@@ -9,11 +9,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { WorkoutBlock, EffortLevel } from './types';
+import type { WorkoutBlock, EffortLevel, CardioType } from './types';
 import { useWorkout } from './hooks/useWorkout';
 import { seedDefaultWorkouts } from './data/storage';
-// Cloud sync auto-restore disabled - see comment in useEffect below
-// import { initSync } from './data/sync';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SignUpPromptProvider, useSignUpPrompt } from './contexts/SignUpPromptContext';
+import { performInitialSync, setSyncStatusCallback } from './data/supabaseSync';
 import { NavBar } from './components/NavBar';
 import { WorkoutBuilder } from './components/WorkoutBuilder';
 import { WorkoutStartFlow } from './components/WorkoutStartFlow';
@@ -32,8 +33,9 @@ type Page = 'home' | 'workout' | 'library' | 'chat' | 'settings';
 /** Theme options */
 type Theme = 'dark' | 'light';
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
+  const [homeRefreshKey, setHomeRefreshKey] = useState(0);
   const [showBuilder, setShowBuilder] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -44,6 +46,8 @@ function App() {
     return (saved as Theme) || 'dark';
   });
   const workout = useWorkout();
+  const { user, setSyncStatus } = useAuth();
+  const { triggerSignUpPrompt } = useSignUpPrompt();
 
   // Splash screen timeout
   useEffect(() => {
@@ -56,9 +60,16 @@ function App() {
     seedDefaultWorkouts();
   }, []);
 
-  // Cloud sync disabled for auto-restore to prevent data sharing between users
-  // Data still syncs TO cloud on changes (see scheduleSyncToCloud calls)
-  // useEffect(() => { initSync(); }, []);
+  // Set up sync status callback and perform initial sync on login
+  useEffect(() => {
+    setSyncStatusCallback(setSyncStatus);
+  }, [setSyncStatus]);
+
+  useEffect(() => {
+    if (user) {
+      performInitialSync(user.id);
+    }
+  }, [user]);
 
   // Apply theme
   useEffect(() => {
@@ -76,7 +87,9 @@ function App() {
   // Navigate to workout page only when workout first starts (not on every render)
   const [hasNavigatedToWorkout, setHasNavigatedToWorkout] = useState(false);
   useEffect(() => {
-    if (workout.session && workout.session.blocks?.length > 0 && !hasNavigatedToWorkout) {
+    // Check for either block-based workout or cardio workout
+    const hasActiveWorkout = workout.session && (workout.session.blocks?.length > 0 || workout.session.cardioType);
+    if (hasActiveWorkout && !hasNavigatedToWorkout) {
       setCurrentPage('workout');
       setShowBuilder(false);
       setHasNavigatedToWorkout(true);
@@ -97,9 +110,17 @@ function App() {
     setShowBuilder(false);
   };
 
-  const handleCompleteWorkout = (effort?: EffortLevel) => {
-    workout.completeWorkout(effort);
+  const handleCompleteWorkout = (effort?: EffortLevel, distance?: number) => {
+    workout.completeWorkout(effort, distance);
+    setHomeRefreshKey(k => k + 1); // Force HomePage to remount with fresh data
     setCurrentPage('home');
+    // Prompt anonymous users to sign up after completing a workout
+    triggerSignUpPrompt('workout');
+  };
+
+  const handleStartCardio = (type: CardioType) => {
+    workout.startCardioWorkout(type);
+    setCurrentPage('workout');
   };
 
   const handleCancelWorkout = () => {
@@ -149,10 +170,10 @@ function App() {
 
   return (
     <div className="min-h-screen transition-colors bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      {currentPage === 'home' && <HomePage />}
+      {currentPage === 'home' && <HomePage key={homeRefreshKey} />}
 
       {currentPage === 'workout' && (
-        workout.session && workout.session.blocks?.length > 0 ? (
+        workout.session && (workout.session.blocks?.length > 0 || workout.session.cardioType) ? (
           <WorkoutPage
             session={workout.session}
             currentBlockIndex={workout.currentBlockIndex}
@@ -170,7 +191,14 @@ function App() {
           <WorkoutStartFlow
             onStartLastWorkout={handleBuilderStart}
             onCreateNew={() => setShowBuilder(true)}
-            onStartSavedWorkout={(savedWorkout) => handleBuilderStart(savedWorkout.blocks)}
+            onStartSavedWorkout={(savedWorkout) => {
+              if (savedWorkout.cardioType) {
+                handleStartCardio(savedWorkout.cardioType);
+              } else {
+                handleBuilderStart(savedWorkout.blocks);
+              }
+            }}
+            onStartCardio={handleStartCardio}
             onManageLibrary={() => setCurrentPage('library')}
           />
         )
@@ -187,9 +215,19 @@ function App() {
       <NavBar
         currentPage={currentPage}
         onNavigate={setCurrentPage}
-        hasActiveWorkout={!!workout.session && (workout.session.blocks?.length ?? 0) > 0}
+        hasActiveWorkout={!!workout.session && ((workout.session.blocks?.length ?? 0) > 0 || !!workout.session.cardioType)}
       />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <SignUpPromptProvider>
+        <AppContent />
+      </SignUpPromptProvider>
+    </AuthProvider>
   );
 }
 

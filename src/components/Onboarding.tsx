@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { saveUserName } from '../data/storage';
+import { saveUserName, savePersonality } from '../data/storage';
+import { useAuth } from '../contexts/AuthContext';
+import type { PersonalityType } from '../types';
+import { PERSONALITY_OPTIONS } from '../types';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -10,52 +13,87 @@ const STEPS = [
     title: 'Welcome to Moove',
     description: 'Your personal workout tracker. Track workouts, build routines, and stay consistent.',
     highlight: null,
+    type: 'welcome',
+  },
+  {
+    title: 'Choose Your Vibe',
+    description: 'How do you want the app to talk to you?',
+    highlight: null,
+    type: 'personality',
   },
   {
     title: 'Track Your Progress',
     description: 'See your workout history at a glance. The year grid shows your consistency - tap any day to log a workout or rest day.',
     highlight: 'home',
+    type: 'feature',
   },
   {
     title: 'Start a Workout',
     description: 'Choose from your saved workouts or create a custom routine with warmup, strength, conditioning, and cooldown blocks.',
     highlight: 'workout',
+    type: 'feature',
   },
   {
     title: 'Build Your Library',
     description: 'Save your favorite workouts and browse exercises. Customize routines to match your equipment and goals.',
     highlight: 'library',
+    type: 'feature',
   },
   {
-    title: 'Ask the Assistant',
-    description: 'Have questions about exercises or form? Chat with the AI assistant to get personalized guidance and add new exercises.',
-    highlight: 'chat',
+    title: 'Ask Coach',
+    description: 'Have questions about exercises or form? Chat with Coach to get personalized guidance and add new exercises.',
+    highlight: 'coach',
+    type: 'feature',
   },
 ];
 
 export function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState(0);
   const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedPersonality, setSelectedPersonality] = useState<PersonalityType>('encouraging');
+  const { signInWithEmail, isConfigured } = useAuth();
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
-  const isWelcomeStep = step === 0;
+  const isWelcomeStep = currentStep.type === 'welcome';
+  const isPersonalityStep = currentStep.type === 'personality';
+
+  const finishOnboarding = async () => {
+    if (userName.trim()) {
+      saveUserName(userName.trim());
+    }
+    savePersonality(selectedPersonality);
+
+    // Send magic link if email provided
+    if (userEmail.trim() && isConfigured) {
+      setIsLoading(true);
+      const { error } = await signInWithEmail(userEmail.trim());
+      setIsLoading(false);
+      if (!error) {
+        setEmailSent(true);
+        // Wait a moment to show the message, then complete
+        setTimeout(() => {
+          onComplete();
+        }, 2000);
+        return;
+      }
+    }
+
+    onComplete();
+  };
 
   const handleNext = () => {
     if (isLast) {
-      if (userName.trim()) {
-        saveUserName(userName.trim());
-      }
-      onComplete();
+      finishOnboarding();
     } else {
       setStep(step + 1);
     }
   };
 
   const handleSkip = () => {
-    if (userName.trim()) {
-      saveUserName(userName.trim());
-    }
-    onComplete();
+    finishOnboarding();
   };
 
   return (
@@ -67,17 +105,18 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       <div className="relative flex-1 flex flex-col z-10">
         {/* Mock screen preview - changes based on highlighted feature */}
         <div className="flex-1 overflow-hidden opacity-40 pointer-events-none">
-          {!currentStep.highlight && <MockWelcomeScreen />}
+          {currentStep.type === 'welcome' && <MockWelcomeScreen />}
+          {currentStep.type === 'personality' && <MockPersonalityScreen />}
           {currentStep.highlight === 'home' && <MockHomeScreen />}
           {currentStep.highlight === 'workout' && <MockWorkoutScreen />}
           {currentStep.highlight === 'library' && <MockLibraryScreen />}
-          {currentStep.highlight === 'chat' && <MockChatScreen />}
+          {currentStep.highlight === 'coach' && <MockCoachScreen />}
         </div>
 
         {/* Highlight overlay for nav items */}
         {currentStep.highlight && (
           <div className="absolute bottom-20 left-0 right-0 flex justify-around px-4 pb-2">
-            {['home', 'workout', 'library', 'chat', 'settings'].map((item) => (
+            {['home', 'workout', 'library', 'coach', 'settings'].map((item) => (
               <div
                 key={item}
                 className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all ${
@@ -118,9 +157,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           {currentStep.description}
         </p>
 
-        {/* Name input on welcome step */}
+        {/* Name and email input on welcome step */}
         {isWelcomeStep && (
-          <div className="mb-6">
+          <div className="mb-6 space-y-3">
             <input
               type="text"
               placeholder="What's your first name?"
@@ -128,25 +167,95 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               onChange={(e) => setUserName(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+            {isConfigured && (
+              <div>
+                <input
+                  type="email"
+                  placeholder="Email (optional)"
+                  value={userEmail}
+                  onChange={(e) => setUserEmail(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-1.5">
+                  Sync your workouts across devices
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        <div className="flex gap-3">
-          {!isLast && (
+        {/* Personality selection step */}
+        {isPersonalityStep && (
+          <div className="mb-6">
+            <div className="grid grid-cols-2 gap-2">
+              {PERSONALITY_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setSelectedPersonality(option.value)}
+                  className={`p-3 rounded-xl border-2 transition-all text-left ${
+                    selectedPersonality === option.value
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                      : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
+                  }`}
+                >
+                  <div className={`font-medium text-sm ${
+                    selectedPersonality === option.value
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : 'text-slate-700 dark:text-slate-300'
+                  }`}>
+                    {option.label}
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
+                    {option.description}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Email sent confirmation */}
+        {emailSent ? (
+          <div className="text-center py-4">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Check your email to complete sign in
+            </p>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            {!isLast && (
+              <button
+                onClick={handleSkip}
+                disabled={isLoading}
+                className="flex-1 py-3.5 rounded-xl text-slate-500 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+              >
+                Skip
+              </button>
+            )}
             <button
-              onClick={handleSkip}
-              className="flex-1 py-3.5 rounded-xl text-slate-500 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              onClick={handleNext}
+              disabled={isLoading}
+              className={`${isLast ? 'flex-1' : 'flex-[2]'} py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2`}
             >
-              Skip
+              {isLoading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Sending...
+                </>
+              ) : (
+                isLast ? "Let's Go" : 'Next'
+              )}
             </button>
-          )}
-          <button
-            onClick={handleNext}
-            className={`${isLast ? 'flex-1' : 'flex-[2]'} py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors`}
-          >
-            {isLast ? "Let's Go" : 'Next'}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -165,7 +274,7 @@ function MockWelcomeScreen() {
           { icon: '📊', label: 'Track Progress', color: 'bg-emerald-500' },
           { icon: '💪', label: 'Build Workouts', color: 'bg-blue-500' },
           { icon: '📚', label: 'Exercise Library', color: 'bg-purple-500' },
-          { icon: '✨', label: 'AI Assistant', color: 'bg-amber-500' },
+          { icon: '💬', label: 'Ask Coach', color: 'bg-amber-500' },
         ].map((feature, i) => (
           <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur">
             <div className={`w-10 h-10 rounded-lg ${feature.color} flex items-center justify-center text-lg`}>
@@ -179,61 +288,110 @@ function MockWelcomeScreen() {
   );
 }
 
+// Mock personality screen for onboarding preview
+function MockPersonalityScreen() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-950 flex flex-col items-center pt-24 px-8">
+      {/* Logo */}
+      <img src="/logo_icon.png" alt="Moove" className="h-16 mb-6 dark:invert" />
+
+      {/* Speech bubbles showing different personalities */}
+      <div className="w-full max-w-xs space-y-4 mt-4">
+        {[
+          { label: 'Encouraging', msg: "You're doing amazing! Keep it up!", color: 'bg-emerald-500' },
+          { label: 'Drill Sergeant', msg: "DROP AND GIVE ME 20!", color: 'bg-red-500' },
+          { label: 'Sarcastic', msg: "Oh look who decided to workout...", color: 'bg-purple-500' },
+          { label: 'Zen', msg: "Find your inner strength...", color: 'bg-cyan-500' },
+        ].map((item, i) => (
+          <div key={i} className="flex items-start gap-3">
+            <div className={`w-8 h-8 rounded-full ${item.color} flex-shrink-0`} />
+            <div className="flex-1 p-3 rounded-xl rounded-tl-sm bg-white/80 dark:bg-slate-800/80 backdrop-blur">
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 block mb-1">{item.label}</span>
+              <span className="text-sm text-slate-700 dark:text-slate-300">{item.msg}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Mock home screen for onboarding preview
 function MockHomeScreen() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 px-4 pt-16">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <img src="/logo_icon.png" alt="Moove" className="h-10 dark:invert" />
-        <span className="text-xl font-bold text-slate-900 dark:text-slate-100">Home</span>
+      <div className="flex items-center gap-2 mb-6">
+        <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
+        <img src="/moove.svg" alt="Home" className="h-5 dark:invert" />
       </div>
 
-      {/* Streak banner */}
-      <div className="p-4 rounded-xl bg-gradient-to-r from-amber-100 to-emerald-100 dark:from-amber-600/20 dark:to-emerald-600/20 mb-6">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🔥</span>
-          <div className="h-5 w-24 bg-amber-300/50 rounded" />
-        </div>
+      {/* Greeting */}
+      <div className="mb-4">
+        <div className="h-6 w-40 bg-slate-300 dark:bg-slate-700 rounded mb-1" />
+        <div className="h-4 w-32 bg-slate-200 dark:bg-slate-600 rounded" />
       </div>
 
-      {/* Week view */}
-      <div className="mb-6">
-        <div className="h-5 w-24 bg-slate-300 dark:bg-slate-700 rounded mb-3" />
-        <div className="p-4 rounded-xl bg-white dark:bg-slate-800">
-          <div className="flex justify-between gap-2">
-            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className={`w-10 h-10 rounded-full ${
-                    i <= 4 ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
-                  }`}
-                />
-                <div className="h-3 w-6 bg-slate-200 dark:bg-slate-700 rounded" />
-              </div>
+      {/* This Month card */}
+      <div className="mb-4">
+        <div className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">This Month</div>
+        <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          {/* Date navigation */}
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-700" />
+            <div className="text-sm text-slate-600 dark:text-slate-300 font-medium">Thursday, January 29</div>
+            <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-700" />
+          </div>
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+              <div key={i} className="text-center text-xs text-slate-400">{d}</div>
+            ))}
+          </div>
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div
+                key={i}
+                className={`aspect-square rounded-md ${
+                  i < 3 ? 'bg-transparent' :
+                  i < 10 && i >= 3 ? 'bg-emerald-500' :
+                  i < 15 ? 'bg-slate-200 dark:bg-slate-700' :
+                  'bg-slate-100 dark:bg-slate-800'
+                }`}
+              />
             ))}
           </div>
         </div>
       </div>
 
-      {/* Year grid preview */}
+      {/* This Year card */}
       <div>
-        <div className="h-5 w-20 bg-slate-300 dark:bg-slate-700 rounded mb-3" />
-        <div className="p-4 rounded-xl bg-white dark:bg-slate-800">
-          <div className="flex gap-1">
-            {Array.from({ length: 20 }).map((_, i) => (
-              <div key={i} className="flex flex-col gap-1">
-                {Array.from({ length: 7 }).map((_, j) => (
+        <div className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">This Year</div>
+        <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          {/* Year grid */}
+          <div className="flex gap-[3px] mb-2">
+            {Array.from({ length: 24 }).map((_, weekIdx) => (
+              <div key={weekIdx} className="flex flex-col gap-[3px]">
+                {Array.from({ length: 7 }).map((_, dayIdx) => (
                   <div
-                    key={j}
-                    className={`w-2 h-2 rounded-sm ${
-                      Math.random() > 0.6
-                        ? 'bg-emerald-500'
-                        : 'bg-slate-200 dark:bg-slate-700'
+                    key={dayIdx}
+                    className={`w-[11px] h-[11px] rounded-[2px] ${
+                      weekIdx < 4 && dayIdx < 5 ? 'bg-emerald-500' :
+                      weekIdx < 4 ? 'bg-slate-200 dark:bg-slate-700' :
+                      'bg-slate-200 dark:bg-slate-700'
                     }`}
                   />
                 ))}
               </div>
+            ))}
+          </div>
+          {/* Timeline */}
+          <div className="flex gap-[3px]">
+            {Array.from({ length: 24 }).map((_, i) => (
+              <div key={i} className={`w-[11px] h-[2px] rounded-full ${
+                i < 4 ? 'bg-emerald-300 dark:bg-emerald-700' : 'bg-slate-300 dark:bg-slate-600'
+              }`} />
             ))}
           </div>
         </div>
@@ -247,46 +405,62 @@ function MockWorkoutScreen() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 px-4 pt-16">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <img src="/logo_icon.png" alt="Moove" className="h-10 dark:invert" />
-        <span className="text-xl font-bold text-slate-900 dark:text-slate-100">Workout</span>
+      <div className="flex items-center gap-2 mb-6">
+        <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
+        <img src="/workout.svg" alt="Workout" className="h-5 dark:invert" />
       </div>
 
-      {/* Active workout card */}
-      <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          <span className="font-semibold">Strength Training</span>
-        </div>
-        <div className="text-3xl font-bold mb-1">12:34</div>
-        <div className="text-emerald-100 text-sm">Block 2 of 3 • Exercise 3 of 5</div>
-      </div>
-
-      {/* Current exercise */}
-      <div className="p-4 rounded-xl bg-white dark:bg-slate-800 mb-4">
-        <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-1">CURRENT</div>
-        <div className="font-semibold text-slate-900 dark:text-slate-100 mb-2">Dumbbell Rows</div>
-        <div className="flex gap-4 text-sm text-slate-500">
-          <span>3 × 12</span>
-          <span>35 lbs</span>
-        </div>
-      </div>
-
-      {/* Exercise list */}
-      <div className="space-y-2">
-        {['Bench Press', 'Shoulder Press', 'Bicep Curls'].map((exercise, i) => (
-          <div key={i} className="p-3 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${i < 2 ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                {i < 2 ? '✓' : i + 1}
-              </div>
-              <span className="text-slate-700 dark:text-slate-300">{exercise}</span>
+      {/* Create New Workout button */}
+      <div className="mb-6">
+        <button className="w-full p-5 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-left">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
             </div>
-            <span className="text-sm text-slate-400">3 × 10</span>
+            <div>
+              <div className="text-xl font-semibold">Create New Workout</div>
+              <div className="text-emerald-100 text-sm">Pick exercises for each block</div>
+            </div>
           </div>
-        ))}
+        </button>
+      </div>
+
+      {/* Timed Cardio */}
+      <div className="mb-6">
+        <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Timed Cardio</div>
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { emoji: '🚶', label: 'Walk' },
+            { emoji: '🏃', label: 'Run' },
+            { emoji: '🏔️', label: 'Trail' },
+            { emoji: '🥾', label: 'Hike' },
+          ].map((item, i) => (
+            <div key={i} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <span className="text-2xl">{item.emoji}</span>
+              <span className="text-xs text-slate-600 dark:text-slate-400">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Saved Workouts */}
+      <div>
+        <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Saved Workouts</div>
+        <div className="space-y-2">
+          {['Morning Strength', 'Full Body HIIT'].map((name, i) => (
+            <div key={i} className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div>
+                <div className="font-medium text-slate-900 dark:text-slate-100">{name}</div>
+                <div className="text-sm text-slate-500">3 blocks • 12 exercises</div>
+              </div>
+              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -297,9 +471,9 @@ function MockLibraryScreen() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 px-4 pt-16">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <img src="/logo_icon.png" alt="Moove" className="h-10 dark:invert" />
-        <span className="text-xl font-bold text-slate-900 dark:text-slate-100">Library</span>
+      <div className="flex items-center gap-2 mb-6">
+        <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
+        <img src="/library.svg" alt="Library" className="h-5 dark:invert" />
       </div>
 
       {/* Tabs */}
@@ -310,24 +484,29 @@ function MockLibraryScreen() {
         <div className="flex-1 py-2 px-4 text-center">
           <span className="text-sm text-slate-500">Exercises</span>
         </div>
+        <div className="flex-1 py-2 px-4 text-center">
+          <span className="text-sm text-slate-500">History</span>
+        </div>
       </div>
 
       {/* Saved workouts */}
       <div className="space-y-3">
         {[
-          { name: 'Morning Strength', blocks: 3, exercises: 12, color: 'bg-blue-500' },
-          { name: 'Full Body HIIT', blocks: 4, exercises: 16, color: 'bg-orange-500' },
-          { name: 'Upper Body Focus', blocks: 2, exercises: 8, color: 'bg-purple-500' },
+          { name: 'Morning Strength', blocks: 3, exercises: 12 },
+          { name: 'Full Body HIIT', blocks: 4, exercises: 16 },
+          { name: 'Upper Body Focus', blocks: 2, exercises: 8 },
         ].map((workout, i) => (
-          <div key={i} className="p-4 rounded-xl bg-white dark:bg-slate-800 flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl ${workout.color} flex items-center justify-center`}>
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
+          <div key={i} className="p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div className="flex-1">
-              <div className="font-medium text-slate-900 dark:text-slate-100">{workout.name}</div>
-              <div className="text-sm text-slate-500">{workout.blocks} blocks • {workout.exercises} exercises</div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-slate-900 dark:text-slate-100">{workout.name}</span>
+                <button className="text-slate-300 dark:text-slate-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </button>
+              </div>
+              <div className="text-sm text-slate-500 mt-1">{workout.blocks} blocks • {workout.exercises} exercises</div>
             </div>
             <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -347,14 +526,14 @@ function MockLibraryScreen() {
   );
 }
 
-// Mock chat screen for onboarding preview
-function MockChatScreen() {
+// Mock coach screen for onboarding preview
+function MockCoachScreen() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 px-4 pt-16 flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <img src="/logo_icon.png" alt="Moove" className="h-10 dark:invert" />
-        <span className="text-xl font-bold text-slate-900 dark:text-slate-100">Assistant</span>
+      <div className="flex items-center gap-2 mb-6">
+        <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
+        <img src="/chat.svg" alt="Coach" className="h-5 dark:invert" />
       </div>
 
       {/* Chat messages */}
@@ -392,7 +571,7 @@ function MockChatScreen() {
         <div className="flex justify-start">
           <div className="max-w-[80%] p-3 rounded-2xl rounded-bl-md bg-white dark:bg-slate-800">
             <p className="text-sm text-slate-700 dark:text-slate-300">
-              Done! I've added "Deadlift" to your custom exercises. You can find it in your Library under Exercises. 💪
+              Done! I've added "Deadlift" to your custom exercises. You can find it in your Library under Exercises.
             </p>
           </div>
         </div>
@@ -436,7 +615,7 @@ function NavIcon({ name, active }: { name: string; active: boolean }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
       );
-    case 'chat':
+    case 'coach':
       return (
         <svg className={`w-6 h-6 ${color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
