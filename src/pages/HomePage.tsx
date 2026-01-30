@@ -560,14 +560,10 @@ export function HomePage() {
                             ? 'bg-transparent'
                             : day.hasWorkout
                             ? hasRealWorkout
-                              ? day.hasCardio && !day.hasStrength
-                                ? `bg-cyan-500 text-white ring-2 ring-cyan-300 dark:ring-cyan-700 ${day.isPast ? 'opacity-60' : ''}`
-                                : day.hasStrength && day.hasCardio
-                                ? `bg-gradient-to-br from-emerald-500 to-cyan-500 text-white ring-2 ring-emerald-300 dark:ring-emerald-700 ${day.isPast ? 'opacity-60' : ''}`
-                                : `bg-emerald-600 text-white ring-2 ring-emerald-300 dark:ring-emerald-700 ${day.isPast ? 'opacity-60' : ''}`
+                              ? `bg-emerald-500 text-white ring-2 ring-emerald-300 dark:ring-emerald-700 ${day.isPast ? 'opacity-60' : ''}`
                               : `bg-emerald-500 text-white ${day.isPast ? 'opacity-60' : ''}`
                             : day.isRest
-                            ? `bg-purple-400 dark:bg-purple-500 text-white ${day.isPast ? 'opacity-60' : ''}`
+                            ? `bg-violet-300 dark:bg-violet-400 text-white ${day.isPast ? 'opacity-60' : ''}`
                             : day.isToday
                             ? 'border-2 border-dashed border-emerald-500 text-slate-700 dark:text-slate-300'
                             : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
@@ -579,46 +575,46 @@ export function HomePage() {
                       {isMenuOpen && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setDateMenuOpen(null)} />
-                          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 py-1 min-w-[140px]">
+                          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 py-1 min-w-[160px]">
+                            {/* Empty option - only show if day has something to clear */}
+                            {(day.hasWorkout || day.isRest) && !hasRealWorkout && (
+                              <button
+                                onClick={() => handleDateMenuAction(day.dateStr, 'clear')}
+                                className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-3"
+                              >
+                                <span className="material-symbols-outlined text-slate-400 dark:text-slate-500" style={{ fontSize: '18px' }}>blur_on</span>
+                                <span className="font-semibold text-slate-400 dark:text-slate-500">Empty</span>
+                              </button>
+                            )}
+                            {/* Active option - only for non-real workouts */}
+                            {!hasRealWorkout && (
+                              <button
+                                onClick={() => handleDateMenuAction(day.dateStr, 'workout')}
+                                className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-3"
+                              >
+                                <span className="material-symbols-outlined text-emerald-500" style={{ fontSize: '18px' }}>exercise</span>
+                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">Active</span>
+                              </button>
+                            )}
+                            {/* Rest option - only for non-real workouts */}
+                            {!hasRealWorkout && (
+                              <button
+                                onClick={() => handleDateMenuAction(day.dateStr, 'rest')}
+                                className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-3"
+                              >
+                                <span className="material-symbols-outlined text-violet-400 dark:text-violet-300" style={{ fontSize: '18px' }}>relax</span>
+                                <span className="font-semibold text-violet-500 dark:text-violet-400">Rest</span>
+                              </button>
+                            )}
+                            {/* View History - only for real workouts */}
                             {hasRealWorkout && (
                               <button
                                 onClick={() => handleDateMenuAction(day.dateStr, 'view')}
-                                className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                                className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-3"
                               >
-                                <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                                View Activities
+                                <span className="material-symbols-outlined text-slate-500 dark:text-slate-400" style={{ fontSize: '18px' }}>history</span>
+                                <span className="font-semibold text-slate-600 dark:text-slate-300">View History</span>
                               </button>
-                            )}
-                            {!hasRealWorkout && (
-                              <>
-                                <button
-                                  onClick={() => handleDateMenuAction(day.dateStr, 'workout')}
-                                  className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
-                                >
-                                  <div className="w-4 h-4 rounded-full bg-emerald-500" />
-                                  Mark Workout
-                                </button>
-                                <button
-                                  onClick={() => handleDateMenuAction(day.dateStr, 'rest')}
-                                  className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
-                                >
-                                  <div className="w-4 h-4 rounded-full bg-purple-400 dark:bg-purple-500" />
-                                  Mark Rest Day
-                                </button>
-                                {(day.hasWorkout || day.isRest) && (
-                                  <button
-                                    onClick={() => handleDateMenuAction(day.dateStr, 'clear')}
-                                    className="w-full px-4 py-2 text-left text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 border-t border-slate-200 dark:border-slate-700"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                    Clear
-                                  </button>
-                                )}
-                              </>
                             )}
                           </div>
                         </>
@@ -630,18 +626,18 @@ export function HomePage() {
             ))}
           </div>
           {/* Legend */}
-          <div className="flex items-center justify-center gap-3 mt-3 text-[10px] text-slate-400 dark:text-slate-500">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span>Strength</span>
+          <div className="flex items-center justify-center gap-4 mt-3 text-[11px]">
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-emerald-500" style={{ fontSize: '14px' }}>exercise</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">Active</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-cyan-500" />
-              <span>Cardio</span>
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-violet-400 dark:text-violet-300" style={{ fontSize: '14px' }}>relax</span>
+              <span className="font-semibold text-violet-500 dark:text-violet-400">Rest</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-purple-400 dark:bg-purple-500" />
-              <span>Rest</span>
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-slate-400 dark:text-slate-500" style={{ fontSize: '14px' }}>blur_on</span>
+              <span className="font-semibold text-slate-400 dark:text-slate-500">Empty</span>
             </div>
           </div>
         </div>
@@ -687,20 +683,18 @@ export function HomePage() {
                           !day.date
                             ? 'bg-transparent'
                             : day.hasWorkout
-                            ? day.hasCardio && !day.hasStrength
-                              ? `bg-cyan-500 ${day.isPast ? 'opacity-60' : ''}`
-                              : `bg-emerald-500 ${day.isPast ? 'opacity-60' : ''}`
+                            ? `bg-emerald-500 ${day.isPast ? 'opacity-60' : ''}`
                             : day.isRest
-                            ? `bg-purple-400 dark:bg-purple-500 ${day.isPast ? 'opacity-60' : ''}`
+                            ? `bg-violet-300 dark:bg-violet-400 ${day.isPast ? 'opacity-60' : ''}`
                             : 'bg-slate-200 dark:bg-slate-700'
                         }`}
-                        title={day.date ? `${day.date}: ${day.hasWorkout ? (day.hasCardio && !day.hasStrength ? 'Cardio' : 'Workout') : day.isRest ? 'Rest day' : 'No workout'}` : ''}
+                        title={day.date ? `${day.date}: ${day.hasWorkout ? 'Active' : day.isRest ? 'Rest' : 'Empty'}` : ''}
                       >
                         {day.dayOfMonth > 0 && (
                           <span className={`text-[5px] font-medium leading-none ${
                             day.hasWorkout || day.isRest
-                              ? 'text-white/40'
-                              : 'text-slate-400/50 dark:text-slate-500/50'
+                              ? 'text-white/20'
+                              : 'text-slate-400/30 dark:text-slate-500/30'
                           }`}>
                             {day.dayOfMonth.toString().padStart(2, '0')}
                           </span>
@@ -726,13 +720,19 @@ export function HomePage() {
               ))}
             </div>
           </div>
-          <div className="flex items-center justify-center gap-2 mt-2 text-xs text-slate-500">
-            <div className="w-[11px] h-[11px] rounded-[2px] bg-emerald-500" />
-            <span>Strength</span>
-            <div className="w-[11px] h-[11px] rounded-[2px] bg-cyan-500 ml-2" />
-            <span>Cardio</span>
-            <div className="w-[11px] h-[11px] rounded-[2px] bg-purple-400 dark:bg-purple-500 ml-2" />
-            <span>Rest</span>
+          <div className="flex items-center justify-center gap-4 mt-2 text-[11px]">
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-emerald-500" style={{ fontSize: '14px' }}>exercise</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">Active</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-violet-400 dark:text-violet-300" style={{ fontSize: '14px' }}>relax</span>
+              <span className="font-semibold text-violet-500 dark:text-violet-400">Rest</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-slate-400 dark:text-slate-500" style={{ fontSize: '14px' }}>blur_on</span>
+              <span className="font-semibold text-slate-400 dark:text-slate-500">Empty</span>
+            </div>
           </div>
         </div>
       </section>

@@ -29,6 +29,12 @@ import { UpdatePrompt } from './components/UpdatePrompt';
 
 const ONBOARDING_KEY = 'workout_onboarding_complete';
 
+/** Check if we're coming from an auth callback (magic link) */
+const isAuthCallback = () => {
+  const hash = window.location.hash;
+  return hash.includes('access_token') || hash.includes('refresh_token');
+};
+
 /** Available pages in the app */
 type Page = 'home' | 'workout' | 'library' | 'chat' | 'settings';
 
@@ -41,6 +47,11 @@ function AppContent() {
   const [showBuilder, setShowBuilder] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(() => {
+    // Skip onboarding if coming from magic link (user has been here before)
+    if (isAuthCallback()) {
+      localStorage.setItem(ONBOARDING_KEY, 'true');
+      return false;
+    }
     return !localStorage.getItem(ONBOARDING_KEY);
   });
   const [theme, setTheme] = useState<Theme>(() => {
@@ -49,8 +60,16 @@ function AppContent() {
   });
   const workout = useWorkout();
   const { isLandscape } = useLandscape();
-  const { user, setSyncStatus } = useAuth();
+  const { user, loading: authLoading, setSyncStatus } = useAuth();
   const { triggerSignUpPrompt } = useSignUpPrompt();
+
+  // If user becomes authenticated, they've been here before - skip onboarding
+  useEffect(() => {
+    if (user && showOnboarding) {
+      localStorage.setItem(ONBOARDING_KEY, 'true');
+      setShowOnboarding(false);
+    }
+  }, [user, showOnboarding]);
 
   // Splash screen timeout
   useEffect(() => {
@@ -155,7 +174,21 @@ function AppContent() {
   }
 
   // Show onboarding for new users
+  // But wait for auth to settle if we might be on a callback
   if (showOnboarding) {
+    // If auth is still loading and we're on a callback, wait for it to settle
+    if (authLoading && isAuthCallback()) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100">
+          <img
+            src="/logo_stacked.png"
+            alt="Moove"
+            className="h-32 animate-logo-grow"
+          />
+          <p className="mt-4 text-slate-500 text-sm font-medium tracking-wide">Signing you in...</p>
+        </div>
+      );
+    }
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
