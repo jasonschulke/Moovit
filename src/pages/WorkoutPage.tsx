@@ -589,7 +589,7 @@ export function WorkoutPage({
   // === LANDSCAPE LAYOUT ===
   if (isLandscape) {
     return (
-      <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden">
+      <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden safe-x">
         {/* Thin progress bar at top */}
         <div className="px-4 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-4">
