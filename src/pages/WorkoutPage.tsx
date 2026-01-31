@@ -569,9 +569,9 @@ export function WorkoutPage({
 
   // Shared header component
   const Header = ({ compact = false }: { compact?: boolean }) => (
-    <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 safe-top">
-      <div className={`flex justify-between items-center px-4 ${compact ? 'py-2' : 'py-3'}`}>
-        <img src="/logo_icon.png" alt="Moove" className={`${compact ? 'h-6' : 'h-8'} dark:invert`} />
+    <div className={`bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 safe-top ${compact ? 'px-4 pt-12 pb-2' : 'px-4 pt-16 pb-4'}`}>
+      <div className="flex justify-between items-center">
+        <img src="/logo_icon.png" alt="Moove" className={`${compact ? 'h-6' : 'h-9'} dark:invert`} />
         <span className="text-lg text-slate-600 dark:text-slate-400 tabular-nums font-medium">{formatElapsedTime(elapsedTime)}</span>
         <button
           onClick={() => setShowPauseMenu(true)}

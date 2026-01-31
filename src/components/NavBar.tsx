@@ -8,6 +8,20 @@ interface NavBarProps {
   workoutProgress?: number;
 }
 
+// Animated icon component using APNG
+// Icons from Icons8 (https://icons8.com) - used under free license with attribution
+function AnimatedIcon({ name, size = 28 }: { name: string; size?: number }) {
+  return (
+    <img
+      src={`/animations/${name}.png`}
+      alt={name}
+      width={size}
+      height={size}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
 // Static dumbbell icon (no workout active)
 function DumbbellIcon() {
   return (
@@ -17,31 +31,19 @@ function DumbbellIcon() {
   );
 }
 
-// Animated strength icon
+// Animated strength icon (deadlift)
 function LiftingIcon() {
-  return (
-    <span className="material-symbols-outlined text-white animate-lift" style={{ fontSize: '28px' }}>
-      exercise
-    </span>
-  );
+  return <AnimatedIcon name="deadlift" />;
 }
 
 // Animated running icon
 function RunningIcon() {
-  return (
-    <span className="material-symbols-outlined text-white animate-run-bounce" style={{ fontSize: '28px' }}>
-      sprint
-    </span>
-  );
+  return <AnimatedIcon name="running" />;
 }
 
 // Animated walking icon
 function WalkingIcon() {
-  return (
-    <span className="material-symbols-outlined text-white animate-walk-bounce" style={{ fontSize: '28px' }}>
-      directions_walk
-    </span>
-  );
+  return <AnimatedIcon name="walking" />;
 }
 
 function ProgressRing({ progress, children }: { progress: number; children: React.ReactNode }) {

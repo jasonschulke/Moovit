@@ -26,10 +26,10 @@ function getTimeBasedGreeting(name: string | null, personality: PersonalityType)
       afternoon: [`Hey ${displayName}! Keep that momentum going!`, `Afternoon, ${displayName}! You're doing amazing!`],
       evening: [`Evening, ${displayName}! Great job showing up today!`, `Hey ${displayName}! Finishing the day strong!`],
     },
-    'drill-sergeant': {
-      morning: [`DROP AND GIVE ME 20, ${displayName.toUpperCase()}!`, `RISE AND GRIND, ${displayName.toUpperCase()}! NO EXCUSES!`],
-      afternoon: [`${displayName.toUpperCase()}! TIME TO PUT IN WORK!`, `AFTERNOON MEANS NOTHING! WORK HARDER, ${displayName.toUpperCase()}!`],
-      evening: [`LAST CHANCE TODAY, ${displayName.toUpperCase()}! MAKE IT COUNT!`, `EVENING WARRIOR ${displayName.toUpperCase()} REPORTING FOR DUTY!`],
+    rude: {
+      morning: [`Ugh, you're up? Fine, ${displayName}. Let's get this over with.`, `Oh look, ${displayName} decided to show up. Shocking.`],
+      afternoon: [`Still here, ${displayName}? I guess that's something.`, `Afternoon already and you're just starting, ${displayName}? Whatever.`],
+      evening: [`Cutting it close, ${displayName}. Typical.`, `Finally working out, ${displayName}? Better late than never, I suppose.`],
     },
     zen: {
       morning: [`Breathe in the morning energy, ${displayName}.`, `A peaceful morning awaits you, ${displayName}.`],
@@ -250,6 +250,7 @@ export function HomePage() {
     hasStrength: boolean;
     isRest: boolean;
     isPast: boolean;
+    isToday: boolean;
   };
 
   // Year contribution grid starting from Jan 1, 2026
@@ -294,6 +295,7 @@ export function HomePage() {
         currentMonth = month;
       }
 
+      const isToday = currentDate.toDateString() === now.toDateString();
       currentWeek.push({
         date: isInYear ? dateStr : '',
         dayOfMonth: isInYear ? currentDate.getDate() : 0,
@@ -302,6 +304,7 @@ export function HomePage() {
         hasStrength: isInYear ? dayInfo.hasStrength : false,
         isRest: isInYear ? restDays.has(dateStr) : false,
         isPast: isInYear ? isPast : false,
+        isToday: isInYear ? isToday : false,
       });
 
       if (currentWeek.length === 7) {
@@ -321,7 +324,7 @@ export function HomePage() {
 
     if (currentWeek.length > 0) {
       while (currentWeek.length < 7) {
-        currentWeek.push({ date: '', dayOfMonth: 0, hasWorkout: false, hasCardio: false, hasStrength: false, isRest: false, isPast: false });
+        currentWeek.push({ date: '', dayOfMonth: 0, hasWorkout: false, hasCardio: false, hasStrength: false, isRest: false, isPast: false, isToday: false });
       }
       if (weekContainsToday) {
         foundCurrentWeekIdx = weeks.length;
@@ -468,18 +471,15 @@ export function HomePage() {
   return (
     <div className="min-h-screen pb-24 bg-slate-100 dark:bg-slate-950">
       {/* Header */}
-      <header className="safe-top pt-12">
-        <div className="px-4 pb-4">
-          {/* Top row: Logo + title */}
-          <div className="flex items-center gap-2 mb-3">
-            <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
-            <img src="/moove.svg" alt="Moove" className="h-5 dark:invert" />
-          </div>
-
-          {/* Full-width greeting */}
-          <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed">{greeting}</p>
+      <header className="px-4 pt-16 pb-4 safe-top bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
+          <img src="/moove.svg" alt="Moove" className="h-5 dark:invert" />
         </div>
       </header>
+
+      {/* Greeting */}
+      <p className="px-4 mt-4 text-base text-slate-600 dark:text-slate-300 leading-relaxed">{greeting}</p>
 
       {/* This Month Calendar */}
       <section className="px-4 mb-6 mt-4">
@@ -540,7 +540,7 @@ export function HomePage() {
                 key={weekIdx}
                 className={`grid grid-cols-7 py-1 -mx-2 px-2 rounded-lg transition-colors ${
                   week.isCurrentWeek
-                    ? 'bg-emerald-100 dark:bg-emerald-900/40'
+                    ? 'bg-slate-100 dark:bg-slate-800/40'
                     : ''
                 }`}
               >
@@ -687,19 +687,9 @@ export function HomePage() {
                             : day.isRest
                             ? `bg-violet-300 dark:bg-violet-400 ${day.isPast ? 'opacity-60' : ''}`
                             : 'bg-slate-200 dark:bg-slate-700'
-                        }`}
+                        } ${day.isToday ? 'ring-1 ring-orange-400 dark:ring-orange-500' : ''}`}
                         title={day.date ? `${day.date}: ${day.hasWorkout ? 'Active' : day.isRest ? 'Rest' : 'Empty'}` : ''}
-                      >
-                        {day.dayOfMonth > 0 && (
-                          <span className={`text-[5px] font-medium leading-none ${
-                            day.hasWorkout || day.isRest
-                              ? 'text-white/20'
-                              : 'text-slate-400/30 dark:text-slate-500/30'
-                          }`}>
-                            {day.dayOfMonth.toString().padStart(2, '0')}
-                          </span>
-                        )}
-                      </div>
+                      />
                     ))}
                   </div>
                 </div>

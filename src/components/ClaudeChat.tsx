@@ -217,7 +217,7 @@ export function ClaudeChat() {
   return (
     <div className="min-h-screen pb-20 flex flex-col bg-slate-100 dark:bg-slate-950">
       {/* Header */}
-      <header className="px-4 pt-16 pb-4 safe-top">
+      <header className="px-4 pt-16 pb-4 safe-top bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />

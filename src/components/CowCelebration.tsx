@@ -22,10 +22,10 @@ const COW_MESSAGES: Record<PersonalityType, string[]> = {
     'You crushed it! Keep it up!',
     'Incredible effort today!',
   ],
-  'drill-sergeant': [
-    'MISSION ACCOMPLISHED, SOLDIER!',
-    'THAT\'S WHAT I\'M TALKING ABOUT!',
-    'YOU\'VE EARNED YOUR REST!',
+  rude: [
+    'Fine, that was decent. I guess.',
+    'Took you long enough.',
+    'Whatever. At least you finished.',
   ],
   zen: [
     'Your body thanks you.',

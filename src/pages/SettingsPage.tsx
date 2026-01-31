@@ -135,14 +135,14 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
 
   return (
     <div className="min-h-screen pb-24 bg-slate-100 dark:bg-slate-950">
-      <header className="px-4 pt-16 pb-4 safe-top">
+      <header className="px-4 pt-16 pb-4 safe-top bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2">
           <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
           <img src="/settings.svg" alt="Settings" className="h-5 dark:invert" />
         </div>
       </header>
 
-      <div className="px-4 space-y-6">
+      <div className="px-4 space-y-6 mt-4">
         {/* ACCOUNT Section */}
         {isConfigured && (
           <div>
@@ -642,6 +642,17 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
               <div className="flex justify-between">
                 <span>Device ID</span>
                 <span className="text-slate-700 dark:text-slate-300 font-mono text-xs">{deviceId}</span>
+              </div>
+              <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
+                <span>Animated icons by </span>
+                <a
+                  href="https://icons8.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-500"
+                >
+                  Icons8
+                </a>
               </div>
             </div>
           )}

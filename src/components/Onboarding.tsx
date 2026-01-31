@@ -308,7 +308,7 @@ function MockPersonalityScreen() {
       <div className="w-full max-w-xs space-y-4 mt-4">
         {[
           { label: 'Encouraging', msg: "You're doing amazing! Keep it up!", color: 'bg-emerald-500' },
-          { label: 'Drill Sergeant', msg: "DROP AND GIVE ME 20!", color: 'bg-red-500' },
+          { label: 'Rude', msg: "Ugh, finally decided to show up?", color: 'bg-red-500' },
           { label: 'Sarcastic', msg: "Oh look who decided to workout...", color: 'bg-purple-500' },
           { label: 'Zen', msg: "Find your inner strength...", color: 'bg-cyan-500' },
         ].map((item, i) => (

@@ -1037,7 +1037,7 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
 
   return (
     <div className="min-h-screen pb-24 bg-slate-100 dark:bg-slate-950">
-      <header className="px-4 pt-16 pb-4 safe-top">
+      <header className="px-4 pt-16 pb-4 safe-top bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2">
           <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
           <img src="/library.svg" alt="Library" className="h-5 dark:invert" />
@@ -1045,7 +1045,7 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
       </header>
 
       {/* Tabs */}
-      <div className="px-4 mb-4">
+      <div className="px-4 mb-4 mt-4">
         <div className="flex rounded-xl bg-slate-200 dark:bg-slate-800 p-1">
           <button
             onClick={() => setActiveTab('workouts')}
