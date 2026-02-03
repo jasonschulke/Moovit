@@ -73,7 +73,11 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
   const [newExerciseDescription, setNewExerciseDescription] = useState('');
 
   // History state
-  const [sessions, setSessions] = useState(() => loadSessions().filter(s => s.completedAt));
+  const [sessions, setSessions] = useState(() =>
+    loadSessions()
+      .filter(s => s.completedAt)
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+  );
   const [selectedSession, setSelectedSession] = useState<WorkoutSession | null>(null);
 
   // History swipe to delete state
@@ -121,7 +125,7 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
         element.style.transform = 'translateX(-100%)';
         setTimeout(() => {
           deleteSession(swipingSession);
-          setSessions(loadSessions().filter(s => s.completedAt));
+          setSessions(loadSessions().filter(s => s.completedAt).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
         }, 200);
       } else {
         element.style.transform = 'translateX(0)';
@@ -133,7 +137,7 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
 
   const handleDeleteSession = (sessionId: string) => {
     deleteSession(sessionId);
-    setSessions(loadSessions().filter(s => s.completedAt));
+    setSessions(loadSessions().filter(s => s.completedAt).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
     setSelectedSession(null);
   };
 
