@@ -198,8 +198,8 @@ function extractWorkoutsFromChunk(chunk: string, workouts: WorkoutSession[]): vo
         name: mapping.name,
         exercises: [],
       }],
-      startedAt: new Date(startDate).toISOString(),
-      completedAt: new Date(endDate).toISOString(),
+      startedAt: parseHealthDate(startDate).toISOString(),
+      completedAt: parseHealthDate(endDate).toISOString(),
       exercises: [],
       totalDuration: Math.round(durationSeconds),
       ...(effort && { overallEffort: effort }),
@@ -240,6 +240,18 @@ function estimateEffort(activeCalories: number, durationSeconds: number): 1 | 2 
   return 10;
 }
 
+/**
+ * Parse Apple Health date strings like "2024-01-15 08:30:00 -0500"
+ * into valid Date objects. Safari/iOS can't handle this format with new Date().
+ */
+function parseHealthDate(dateStr: string): Date {
+  // Convert "2024-01-15 08:30:00 -0500" → "2024-01-15T08:30:00-05:00"
+  const iso = dateStr
+    .replace(' ', 'T')                    // first space → T
+    .replace(/ ([+-])(\d{2})(\d{2})$/, '$1$2:$3'); // " -0500" → "-05:00"
+  return new Date(iso);
+}
+
 function formatActivityType(type: string): string {
   return type
     .replace('HKWorkoutActivityType', '')
@@ -263,7 +275,7 @@ function extractBodyMetricsFromChunk(chunk: string, metrics: Map<string, BodyMet
     let weight = parseFloat(valueStr);
     if (unit === 'kg') weight = weight * 2.20462;
 
-    const date = new Date(dateStr).toISOString().split('T')[0];
+    const date = parseHealthDate(dateStr).toISOString().split('T')[0];
     const existing = metrics.get(date) || { date, source: 'apple_health' };
     existing.weight = Math.round(weight * 10) / 10;
     metrics.set(date, existing);
@@ -275,7 +287,7 @@ function extractBodyMetricsFromChunk(chunk: string, metrics: Map<string, BodyMet
     const [, valueStr,, dateStr] = match;
     const bodyFat = parseFloat(valueStr) * 100;
 
-    const date = new Date(dateStr).toISOString().split('T')[0];
+    const date = parseHealthDate(dateStr).toISOString().split('T')[0];
     const existing = metrics.get(date) || { date, source: 'apple_health' };
     existing.bodyFat = Math.round(bodyFat * 10) / 10;
     metrics.set(date, existing);
