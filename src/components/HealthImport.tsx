@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { parseHealthExport, type HealthImportResult, type ParseProgress } from '../data/healthImport';
 import { importWorkoutSessions, importBodyMetrics, importActivityDays, loadSessions } from '../data/storage';
 import { Button } from './Button';
@@ -11,7 +11,26 @@ export function HealthImport() {
   const [result, setResult] = useState<HealthImportResult | null>(null);
   const [importCounts, setImportCounts] = useState<{ workouts: number; metrics: number; activity: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [excludedTypes, setExcludedTypes] = useState<Set<string>>(new Set());
+  const [showWorkoutTypes, setShowWorkoutTypes] = useState(false);
+  const [overwrite, setOverwrite] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Group workouts by name for the type filter
+  const workoutsByType = useMemo(() => {
+    if (!result) return new Map<string, number>();
+    const counts = new Map<string, number>();
+    for (const w of result.workouts) {
+      counts.set(w.name, (counts.get(w.name) || 0) + 1);
+    }
+    // Sort by count descending
+    return new Map([...counts.entries()].sort((a, b) => b[1] - a[1]));
+  }, [result]);
+
+  const filteredWorkoutCount = useMemo(() => {
+    if (!result) return 0;
+    return result.workouts.filter(w => !excludedTypes.has(w.name)).length;
+  }, [result, excludedTypes]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -33,6 +52,8 @@ export function HealthImport() {
     try {
       const data = await parseHealthExport(file, setProgress);
       setResult(data);
+      setExcludedTypes(new Set());
+      setShowWorkoutTypes(false);
       setStage('preview');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to parse file';
@@ -46,11 +67,11 @@ export function HealthImport() {
     if (!result) return;
     setStage('importing');
 
-    // Use setTimeout to let the UI update before the potentially heavy import
     setTimeout(() => {
-      const workoutsAdded = importWorkoutSessions(result.workouts);
-      const metricsAdded = importBodyMetrics(result.bodyMetrics);
-      const activityAdded = importActivityDays(result.activityDays);
+      const filteredWorkouts = result.workouts.filter(w => !excludedTypes.has(w.name));
+      const workoutsAdded = importWorkoutSessions(filteredWorkouts, overwrite);
+      const metricsAdded = importBodyMetrics(result.bodyMetrics, overwrite);
+      const activityAdded = importActivityDays(result.activityDays, overwrite);
 
       setImportCounts({ workouts: workoutsAdded, metrics: metricsAdded, activity: activityAdded });
       setStage('done');
@@ -63,7 +84,22 @@ export function HealthImport() {
     setResult(null);
     setImportCounts(null);
     setError(null);
+    setExcludedTypes(new Set());
+    setShowWorkoutTypes(false);
+    setOverwrite(false);
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const toggleWorkoutType = (typeName: string) => {
+    setExcludedTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(typeName)) {
+        next.delete(typeName);
+      } else {
+        next.add(typeName);
+      }
+      return next;
+    });
   };
 
   // Count existing sessions to calculate duplicates
@@ -145,29 +181,73 @@ export function HealthImport() {
           </div>
 
           <div className="space-y-2">
-            {/* Workouts */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {result.workouts.length} Workouts
+            {/* Workouts - tappable to expand type filter */}
+            <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 overflow-hidden">
+              <button
+                onClick={() => setShowWorkoutTypes(!showWorkoutTypes)}
+                className="w-full flex items-center justify-between p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
                   </div>
-                  {result.workouts.length > 0 && (
-                    <div className="text-[11px] text-slate-400 dark:text-slate-500">
-                      {getDateRange(result.workouts.map(w => w.startedAt))}
+                  <div className="text-left">
+                    <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {filteredWorkoutCount === result.workouts.length
+                        ? `${result.workouts.length} Workouts`
+                        : `${filteredWorkoutCount} / ${result.workouts.length} Workouts`
+                      }
                     </div>
-                  )}
+                    {result.workouts.length > 0 && (
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                        {getDateRange(result.workouts.filter(w => !excludedTypes.has(w.name)).map(w => w.startedAt))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {result.workouts.length > 0 && (
-                <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg className={`w-4 h-4 text-slate-400 transition-transform ${showWorkoutTypes ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
+              </button>
+
+              {/* Workout type filter */}
+              {showWorkoutTypes && (
+                <div className="px-3 pb-3 space-y-1">
+                  {[...workoutsByType.entries()].map(([typeName, count]) => {
+                    const included = !excludedTypes.has(typeName);
+                    return (
+                      <button
+                        key={typeName}
+                        onClick={() => toggleWorkoutType(typeName)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors ${
+                          included
+                            ? 'bg-white dark:bg-slate-700/50'
+                            : 'bg-slate-100 dark:bg-slate-800/80 opacity-50'
+                        }`}
+                      >
+                        <span className={`text-sm ${included ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 line-through'}`}>
+                          {typeName}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400 dark:text-slate-500">{count}</span>
+                          <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                            included
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-slate-200 dark:bg-slate-600'
+                          }`}>
+                            {included && (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
@@ -225,9 +305,22 @@ export function HealthImport() {
           </div>
 
           {existingCount > 0 && (
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              You have {existingCount} existing workouts. Duplicates will be skipped automatically.
-            </p>
+            <button
+              onClick={() => setOverwrite(!overwrite)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50"
+            >
+              <div className="text-left">
+                <div className="text-sm text-slate-600 dark:text-slate-300">
+                  Overwrite existing data
+                </div>
+                <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                  {overwrite ? 'Matching records will be replaced' : 'Duplicates will be skipped'}
+                </div>
+              </div>
+              <div className={`w-10 h-6 rounded-full p-0.5 transition-colors ${overwrite ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${overwrite ? 'translate-x-4' : 'translate-x-0'}`} />
+              </div>
+            </button>
           )}
 
           <div className="flex gap-2">
@@ -238,9 +331,9 @@ export function HealthImport() {
               variant="primary"
               onClick={handleImport}
               className="flex-1"
-              disabled={result.workouts.length === 0 && result.bodyMetrics.length === 0 && result.activityDays.length === 0}
+              disabled={filteredWorkoutCount === 0 && result.bodyMetrics.length === 0 && result.activityDays.length === 0}
             >
-              Import All
+              Import{filteredWorkoutCount < result.workouts.length ? ` (${filteredWorkoutCount} workouts)` : ' All'}
             </Button>
           </div>
         </div>
@@ -271,7 +364,7 @@ export function HealthImport() {
 
           <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
             {importCounts.workouts > 0 && (
-              <div>{importCounts.workouts} new workout{importCounts.workouts !== 1 ? 's' : ''} imported</div>
+              <div>{importCounts.workouts} workout{importCounts.workouts !== 1 ? 's' : ''} imported</div>
             )}
             {importCounts.metrics > 0 && (
               <div>{importCounts.metrics} body measurement{importCounts.metrics !== 1 ? 's' : ''} imported</div>

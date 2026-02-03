@@ -996,8 +996,15 @@ export function saveBodyMetrics(metrics: BodyMetric[]): void {
   triggerSyncIfLoggedIn();
 }
 
-export function importBodyMetrics(newMetrics: BodyMetric[]): number {
+export function importBodyMetrics(newMetrics: BodyMetric[], overwrite = false): number {
   const existing = loadBodyMetrics();
+  if (overwrite) {
+    const newDates = new Set(newMetrics.map(m => m.date));
+    const kept = existing.filter(m => !newDates.has(m.date));
+    const merged = [...kept, ...newMetrics].sort((a, b) => a.date.localeCompare(b.date));
+    saveBodyMetrics(merged);
+    return newMetrics.length;
+  }
   const existingDates = new Set(existing.map(m => m.date));
   const toAdd = newMetrics.filter(m => !existingDates.has(m.date));
   if (toAdd.length > 0) {
@@ -1017,8 +1024,15 @@ export function saveActivityDays(days: ActivityDay[]): void {
   triggerSyncIfLoggedIn();
 }
 
-export function importActivityDays(newDays: ActivityDay[]): number {
+export function importActivityDays(newDays: ActivityDay[], overwrite = false): number {
   const existing = loadActivityDays();
+  if (overwrite) {
+    const newDates = new Set(newDays.map(d => d.date));
+    const kept = existing.filter(d => !newDates.has(d.date));
+    const merged = [...kept, ...newDays].sort((a, b) => a.date.localeCompare(b.date));
+    saveActivityDays(merged);
+    return newDays.length;
+  }
   const existingDates = new Set(existing.map(d => d.date));
   const toAdd = newDays.filter(d => !existingDates.has(d.date));
   if (toAdd.length > 0) {
@@ -1028,8 +1042,23 @@ export function importActivityDays(newDays: ActivityDay[]): number {
   return toAdd.length;
 }
 
-export function importWorkoutSessions(newSessions: WorkoutSession[]): number {
+export function importWorkoutSessions(newSessions: WorkoutSession[], overwrite = false): number {
   const existing = loadSessions();
+
+  if (overwrite) {
+    // Remove existing sessions that overlap with incoming ones (within 60s)
+    const newStarts = newSessions.map(s => new Date(s.startedAt).getTime());
+    const kept = existing.filter(s => {
+      const t = new Date(s.startedAt).getTime();
+      return !newStarts.some(nt => Math.abs(nt - t) < 60000);
+    });
+    const merged = [...kept, ...newSessions].sort((a, b) =>
+      new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
+    );
+    saveSessions(merged);
+    return newSessions.length;
+  }
+
   const existingStarts = existing.map(s => new Date(s.startedAt).getTime());
 
   // Skip duplicates - sessions within 60 seconds of an existing session's start time
