@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from 'react';
 import type { BlockType, WorkoutExercise, WorkoutBlock, MuscleArea, EquipmentType, SavedWorkout } from '../types';
 import { useExercises } from '../contexts/ExerciseContext';
 import { useSignUpPrompt } from '../contexts/SignUpPromptContext';
+import { useToast } from '../contexts/ToastContext';
 import { Button } from './Button';
 
 interface WorkoutBuilderProps {
@@ -85,6 +86,7 @@ function workoutBlocksToBuilderBlocks(workoutBlocks: WorkoutBlock[]): BuilderBlo
 export function WorkoutBuilder({ onStart, onCancel, editWorkout, onSave }: WorkoutBuilderProps) {
   const { triggerSignUpPrompt } = useSignUpPrompt();
   const { exercises, addExercise: addCustomExercise, getExerciseById } = useExercises();
+  const { showToast } = useToast();
 
   const isEditMode = !!editWorkout;
 
@@ -312,6 +314,7 @@ export function WorkoutBuilder({ onStart, onCancel, editWorkout, onSave }: Worko
     setShowCreateExercise(false);
     setCreateForBlockId(null);
     setCreateForSet(null);
+    showToast(`${newExercise.name} added to your library!`);
     triggerSignUpPrompt('exercise');
   };
 

@@ -20,6 +20,7 @@ import { deleteAllCloudData } from '../data/supabaseSync';
 import { useAuth } from '../contexts/AuthContext';
 import { AuthModal } from '../components/AuthModal';
 import { Button } from '../components/Button';
+import { HealthImport } from '../components/HealthImport';
 import type { Exercise, PersonalityType } from '../types';
 import { PERSONALITY_OPTIONS } from '../types';
 
@@ -305,6 +306,7 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
             ))}
           </div>
         </section>
+
           </div>
         </div>
 
@@ -312,6 +314,28 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
         <div>
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">My Data</h2>
           <div className="space-y-4">
+
+        {/* Import Health Data - Collapsible */}
+        <section className="rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden">
+          <button
+            onClick={() => toggleSection('importData')}
+            className="w-full p-4 flex items-center justify-between text-left"
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Import Health Data</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Import from Apple Health</p>
+            </div>
+            <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedSections.has('importData') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {expandedSections.has('importData') && (
+            <div className="px-4 pb-4">
+              <HealthImport />
+            </div>
+          )}
+        </section>
+
         {/* Custom Exercises Section - Collapsible */}
         <section className="rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden">
           <button
@@ -643,16 +667,30 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
                 <span>Device ID</span>
                 <span className="text-slate-700 dark:text-slate-300 font-mono text-xs">{deviceId}</span>
               </div>
-              <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
-                <span>Animated icons by </span>
-                <a
-                  href="https://icons8.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-500"
-                >
-                  Icons8
-                </a>
+              <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700 space-y-1">
+                <div>
+                  <span>Animated icons by </span>
+                  <a
+                    href="https://icons8.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-500"
+                  >
+                    Icons8
+                  </a>
+                </div>
+                <div>
+                  <span>Equipment icons from </span>
+                  <a
+                    href="https://thenounproject.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-500"
+                  >
+                    Noun Project
+                  </a>
+                  <span> (CC BY 3.0)</span>
+                </div>
               </div>
             </div>
           )}

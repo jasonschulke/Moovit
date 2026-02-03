@@ -16,6 +16,7 @@ import { seedDefaultWorkouts } from './data/storage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SignUpPromptProvider, useSignUpPrompt } from './contexts/SignUpPromptContext';
 import { ExerciseProvider } from './contexts/ExerciseContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { performInitialSync, setSyncStatusCallback } from './data/supabaseSync';
 import { NavBar } from './components/NavBar';
 import { WorkoutBuilder } from './components/WorkoutBuilder';
@@ -284,8 +285,10 @@ function App() {
     <AuthProvider>
       <ExerciseProvider>
         <SignUpPromptProvider>
-          <AppContent />
-          <UpdatePrompt />
+          <ToastProvider>
+            <AppContent />
+            <UpdatePrompt />
+          </ToastProvider>
         </SignUpPromptProvider>
       </ExerciseProvider>
     </AuthProvider>

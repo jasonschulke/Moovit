@@ -176,3 +176,38 @@ body {
 .animate-walk-bounce {
   animation: walk-bounce 0.7s ease-in-out infinite;
 }
+
+/* Toast slide up animation */
+@keyframes slideUp {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Slow pulse for current exercise indicator */
+@keyframes slow-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.animate-slow-pulse {
+  animation: slow-pulse 2s ease-in-out infinite;
+}
+
+/* Diagonal stripes for active indicator */
+.stripe-active {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 4px,
+    rgba(16, 185, 129, 0.15) 4px,
+    rgba(16, 185, 129, 0.15) 8px
+  );
+}

@@ -16,7 +16,22 @@ export type EquipmentType =
   | 'sandbag'
   | 'resistance-band'
   | 'cable'
-  | 'machine';
+  | 'machine'
+  | 'yoga-mat'
+  | 'jump-rope'
+  | 'ab-wheel'
+  | 'treadmill'
+  | 'smartwatch'
+  | 'weight-scale'
+  | 'hand-gripper'
+  | 'squat-rack'
+  | 'bench-press'
+  | 'exercise-bike';
+
+/** User's equipment inventory with available weights for each type */
+export type EquipmentInventory = {
+  [K in Exclude<EquipmentType, 'bodyweight'>]?: number[];
+};
 
 /** Movement patterns / muscle groups for categorizing exercises */
 export type MuscleArea =
@@ -163,6 +178,26 @@ export interface WorkoutState {
   currentSetIndex: number;
   isTimerActive: boolean;
   timerSeconds: number;
+}
+
+// ============================================================================
+// HEALTH DATA (Apple Health Import)
+// ============================================================================
+
+/** A body metric measurement (weight, body fat, etc.) */
+export interface BodyMetric {
+  date: string;          // ISO date string
+  weight?: number;       // lbs
+  bodyFat?: number;      // percentage
+  source: string;        // 'apple_health' | 'manual'
+}
+
+/** A daily activity summary (from Apple Health activity rings) */
+export interface ActivityDay {
+  date: string;          // YYYY-MM-DD
+  activeEnergy?: number; // kcal
+  exerciseMinutes?: number;
+  standHours?: number;
 }
 
 // ============================================================================

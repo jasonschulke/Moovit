@@ -7,7 +7,7 @@ import {
   type ChatMessage,
 } from '../data/storage';
 import { useExercises } from '../contexts/ExerciseContext';
-import { Button } from './Button';
+import { useToast } from '../contexts/ToastContext';
 
 const SYSTEM_PROMPT = `You are a fitness assistant embedded in a workout tracking PWA. You can help users:
 
@@ -49,12 +49,80 @@ export function ClaudeChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Feedback modal state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'other'>('other');
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+
+  // Voice input state
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
   const apiKey = getClaudeApiKey();
   const { customExercises, addExercise } = useExercises();
+  const { showToast } = useToast();
 
   useEffect(() => {
     setMessages(loadChatHistory());
   }, []);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+
+        if (finalTranscript) {
+          setInput(prev => prev + (prev ? ' ' : '') + finalTranscript);
+        }
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      showToast('Voice input not supported in this browser');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -158,6 +226,7 @@ export function ClaudeChat() {
       for (const exercise of parsedExercises) {
         // Use context's addExercise - this will update the exercise list app-wide
         addExercise(exercise);
+        showToast(`${exercise.name} added to your library!`);
       }
 
       const assistantMessage: ChatMessage = {
@@ -186,6 +255,50 @@ export function ClaudeChat() {
   const clearChat = () => {
     setMessages([]);
     saveChatHistory([]);
+  };
+
+  const handleSendFeedback = async () => {
+    if (!feedbackText.trim() || !apiKey) return;
+    setIsSendingFeedback(true);
+
+    try {
+      // Generate AI summary using Claude
+      const summaryPrompt = `Summarize this user feedback in 1-2 sentences for a developer email. Be concise and clear about the main point:\n\nType: ${feedbackType}\nFeedback: ${feedbackText}`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 200,
+          messages: [{ role: 'user', content: summaryPrompt }],
+        }),
+      });
+
+      const data = await response.json();
+      const summary = data.content?.[0]?.text || feedbackText;
+
+      // Send email via mailto link
+      const subject = encodeURIComponent(`Moove Feedback: ${feedbackType}`);
+      const body = encodeURIComponent(
+        `Feedback Type: ${feedbackType}\n\nSummary: ${summary}\n\nOriginal Feedback:\n${feedbackText}\n\n---\nSent from Moove App`
+      );
+      window.open(`mailto:jasonschulke@gmail.com?subject=${subject}&body=${body}`);
+
+      setShowFeedbackModal(false);
+      setFeedbackText('');
+      setFeedbackType('other');
+      showToast('Feedback ready to send!');
+    } catch (err) {
+      setError('Failed to prepare feedback');
+    } finally {
+      setIsSendingFeedback(false);
+    }
   };
 
   if (!apiKey) {
@@ -223,15 +336,26 @@ export function ClaudeChat() {
             <img src="/logo_icon.png" alt="Moove" className="h-9 dark:invert" />
             <img src="/chat.svg" alt="Chat" className="h-5 dark:invert" />
           </div>
-          <button
-            onClick={clearChat}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2"
-            title="Clear chat"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowFeedbackModal(true)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2"
+              title="Send feedback"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+            </button>
+            <button
+              onClick={clearChat}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2"
+              title="Clear chat"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -314,29 +438,102 @@ export function ClaudeChat() {
       </div>
 
       {/* Input - Fixed at bottom above tab bar */}
-      <div className="px-4 py-3 bg-slate-100 dark:bg-slate-950 safe-bottom">
-        <div className="flex gap-3 items-end">
+      <div className="px-4 pt-2 pb-4 mb-4 bg-slate-100 dark:bg-slate-950">
+        <div className="flex gap-2">
           <textarea
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about exercises, workouts..."
-            rows={2}
-            className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none min-h-[60px]"
+            placeholder={isListening ? 'Listening...' : 'Ask about exercises, workouts...'}
+            rows={3}
+            className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
           />
-          <Button
-            variant="primary"
-            onClick={sendMessage}
-            disabled={!input.trim() || isLoading}
-            className="px-4 h-[60px]"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          </Button>
+          <div className="flex flex-col gap-2">
+            {/* Microphone button */}
+            <button
+              onClick={toggleVoiceInput}
+              className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
+                isListening
+                  ? 'bg-red-500 text-white animate-pulse'
+                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 hover:border-emerald-500 dark:hover:border-emerald-400'
+              }`}
+              title={isListening ? 'Stop listening' : 'Voice input'}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+            </button>
+            {/* Send button */}
+            <button
+              onClick={sendMessage}
+              disabled={!input.trim() || isLoading}
+              className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-colors bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowFeedbackModal(false)}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Send Feedback</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type</label>
+                <div className="flex gap-2">
+                  {(['bug', 'feature', 'other'] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setFeedbackType(type)}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                        feedbackType === type
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Message</label>
+                <textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  placeholder="Tell us what you think..."
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-lg font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendFeedback}
+                disabled={!feedbackText.trim() || isSendingFeedback}
+                className="flex-1 py-2.5 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isSendingFeedback ? 'Preparing...' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

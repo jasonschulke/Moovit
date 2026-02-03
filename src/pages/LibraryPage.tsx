@@ -6,12 +6,13 @@ import { useExercises } from '../contexts/ExerciseContext';
 import { useSignUpPrompt } from '../contexts/SignUpPromptContext';
 import { Button } from '../components/Button';
 import { WorkoutBuilder } from '../components/WorkoutBuilder';
+import { EquipmentGallery } from '../components/EquipmentGallery';
 
 interface LibraryPageProps {
   onStartWorkout: (blocks: WorkoutBlock[]) => void;
 }
 
-type TabType = 'workouts' | 'exercises' | 'history';
+type TabType = 'workouts' | 'exercises' | 'history' | 'equipment';
 
 type SourceFilter = 'all' | 'default' | 'custom' | 'favorites';
 type TypeFilter = 'all' | MuscleArea;
@@ -1068,6 +1069,16 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
             Exercises
           </button>
           <button
+            onClick={() => setActiveTab('equipment')}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'equipment'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            Gear
+          </button>
+          <button
             onClick={() => setActiveTab('history')}
             className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'history'
@@ -1577,6 +1588,13 @@ export function LibraryPage({ onStartWorkout }: LibraryPageProps) {
             )}
           </div>
         )
+      )}
+
+      {/* Equipment Tab */}
+      {activeTab === 'equipment' && (
+        <div className="px-4 pb-24">
+          <EquipmentGallery />
+        </div>
       )}
 
       {/* Create Exercise Modal */}

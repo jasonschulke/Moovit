@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import type { WorkoutExercise } from '../types';
+import type { WorkoutExercise, ExerciseLog } from '../types';
 import { getExerciseById, getAlternatives } from '../data/exercises';
-import { getLastWeekAverages, getDefaultWeightForEquipment } from '../data/storage';
+import { getLastWeekAverages, getDefaultWeightForEquipment, getExerciseHistory } from '../data/storage';
 import { fetchExerciseGif } from '../utils/exerciseGifs';
 import { Timer } from './Timer';
+import { Sparkline } from './Sparkline';
 
 interface ExerciseViewProps {
   workoutExercise: WorkoutExercise;
@@ -52,6 +53,7 @@ export function ExerciseView({
   const [showTimer, setShowTimer] = useState(false);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
   const [gifLoading, setGifLoading] = useState(true);
+  const [exerciseHistory, setExerciseHistory] = useState<ExerciseLog[]>([]);
 
   // Reset state when exercise changes - fixes the weight/reps auto-apply bug
   useEffect(() => {
@@ -70,6 +72,14 @@ export function ExerciseView({
       });
     }
   }, [exercise?.name]);
+
+  // Fetch exercise history for sparklines (90 days ~ 50 data points max)
+  useEffect(() => {
+    if (exercise) {
+      const history = getExerciseHistory(exercise.id, 50);
+      setExerciseHistory(history);
+    }
+  }, [exercise?.id]);
 
   if (!exercise) {
     return <div className="p-4 text-red-400">Exercise not found</div>;
@@ -129,6 +139,24 @@ export function ExerciseView({
               {exercise.description || 'Perform the exercise with controlled movement and proper form.'}
             </p>
           </div>
+
+          {/* Progress Sparklines - 90 day trailing */}
+          {exerciseHistory.length >= 2 && (
+            <div className={`flex items-center justify-center gap-6 ${compact ? 'mb-3' : 'mb-4'}`}>
+              {exerciseHistory.some(h => h.weight && h.weight > 0) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 dark:text-slate-500">Weight</span>
+                  <Sparkline history={exerciseHistory} metric="weight" />
+                </div>
+              )}
+              {exerciseHistory.some(h => typeof h.reps === 'number' && h.reps > 0) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 dark:text-slate-500">Reps</span>
+                  <Sparkline history={exerciseHistory} metric="reps" />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Weight & Reps Input */}
           <div className="grid grid-cols-2 gap-3">

@@ -53,9 +53,20 @@ function ProgressRing({ progress, children }: { progress: number; children: Reac
   return (
     <div className="relative w-14 h-14">
       <svg className="absolute inset-0 -rotate-90" viewBox="0 0 56 56">
-        {/* Background track - light gray in light mode, dark in dark mode */}
-        <circle cx="28" cy="28" r="24" fill="none" className="stroke-slate-300 dark:stroke-slate-700" strokeWidth="3" />
-        {/* Progress arc - emerald to match the button */}
+        <defs>
+          {/* Diagonal stripe pattern for remaining track */}
+          <pattern id="stripePattern" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(-45)">
+            <rect width="6" height="6" fill="rgba(16, 185, 129, 0.15)" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(16, 185, 129, 0.25)" strokeWidth="3" />
+          </pattern>
+        </defs>
+        {/* Background track - faint green with stripes */}
+        <circle cx="28" cy="28" r="24" fill="none" stroke="url(#stripePattern)" strokeWidth="3" />
+        {/* Faint green base under stripes */}
+        <circle cx="28" cy="28" r="24" fill="none" className="stroke-emerald-100 dark:stroke-emerald-700/20" strokeWidth="3" />
+        {/* Stripe overlay */}
+        <circle cx="28" cy="28" r="24" fill="none" stroke="url(#stripePattern)" strokeWidth="3" />
+        {/* Progress arc - solid emerald on top */}
         <circle
           cx="28" cy="28" r="24"
           fill="none"

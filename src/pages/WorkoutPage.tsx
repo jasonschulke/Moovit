@@ -60,7 +60,8 @@ export function WorkoutPage({
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showPauseMenu, setShowPauseMenu] = useState(false);
   const [showLandscapeTip, setShowLandscapeTip] = useState(false);
-  const [hasSeenLandscapeTip, setHasSeenLandscapeTip] = useState(false);
+  const [tvModeEnabled, setTvModeEnabled] = useState(false); // TV mode only activates on first landscape rotation
+  const [tvModeActivatedOnce, setTvModeActivatedOnce] = useState(false); // Tracks if TV mode was offered this session
   const [wasPortrait, setWasPortrait] = useState(!isLandscape);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [pausedTime, setPausedTime] = useState(0); // Accumulated paused time
@@ -105,14 +106,17 @@ export function WorkoutPage({
     }
   }, [session, blocks.length, currentBlock, showComplete]);
 
-  // Show landscape tip when rotating to landscape (once per session)
+  // Show landscape tip only on FIRST landscape rotation during session
+  // TV mode stays enabled until user opts out, but tip only shows once
   useEffect(() => {
-    if (isLandscape && wasPortrait && !hasSeenLandscapeTip) {
+    if (isLandscape && wasPortrait && !tvModeActivatedOnce) {
+      // First time going landscape - show tip and enable TV mode
       setShowLandscapeTip(true);
-      setHasSeenLandscapeTip(true);
+      setTvModeEnabled(true);
+      setTvModeActivatedOnce(true);
     }
     setWasPortrait(!isLandscape);
-  }, [isLandscape, wasPortrait, hasSeenLandscapeTip]);
+  }, [isLandscape, wasPortrait, tvModeActivatedOnce]);
 
   // Build timeline segments - grouped by block
   const timelineBlocks = useMemo(() => {
@@ -525,12 +529,38 @@ export function WorkoutPage({
             }
 
             if (block.isCurrent) {
-              // Current block: large pill with counter inside
+              // Current block: large pill with segmented exercise progress
+              const exerciseCount = currentBlock?.exercises.length || 1;
               return (
                 <div key={idx} className="flex-[1.8]">
-                  <div className="h-6 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden relative">
-                    <div className="h-full bg-emerald-500 transition-all duration-300 rounded-full" style={{ width: `${progressPercent}%` }} />
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white drop-shadow-sm">
+                  <div className="h-6 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden relative flex">
+                    {currentBlock?.exercises.map((_, eIdx) => {
+                      const segmentWidth = 100 / exerciseCount;
+                      const isCompleted = eIdx < currentExerciseIndex;
+                      const isCurrent = eIdx === currentExerciseIndex;
+                      const isFirst = eIdx === 0;
+                      const isLast = eIdx === exerciseCount - 1;
+                      const isLastCompleted = isCompleted && eIdx === currentExerciseIndex - 1;
+                      const hasCompletedBefore = currentExerciseIndex > 0;
+
+                      return (
+                        <div
+                          key={eIdx}
+                          className={`h-full transition-all duration-300 relative overflow-hidden ${
+                            isCompleted
+                              ? 'bg-emerald-500 z-10'
+                              : isCurrent
+                              ? 'bg-emerald-100 dark:bg-emerald-700/20 stripe-active rounded-l-full'
+                              : 'bg-slate-200 dark:bg-slate-700'
+                          } ${isFirst && !isCurrent ? 'rounded-l-full' : ''} ${isLast || isCurrent || isLastCompleted ? 'rounded-r-full' : ''}`}
+                          style={{
+                            width: isCurrent && hasCompletedBefore ? `calc(${segmentWidth}% + 20px)` : `${segmentWidth}%`,
+                            marginLeft: isCurrent && hasCompletedBefore ? '-20px' : undefined
+                          }}
+                        />
+                      );
+                    })}
+                    <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
                       {counterText}
                     </span>
                   </div>
@@ -586,8 +616,9 @@ export function WorkoutPage({
     </div>
   );
 
-  // === LANDSCAPE LAYOUT ===
-  if (isLandscape) {
+  // === LANDSCAPE LAYOUT (TV Mode) ===
+  // Only show TV mode if user hasn't opted out
+  if (isLandscape && tvModeEnabled) {
     return (
       <div className="h-screen w-screen bg-black overflow-hidden safe-x">
         <div className="h-[109%] w-[109%] origin-top-left scale-[0.92] flex flex-col bg-slate-100 dark:bg-black p-4">
@@ -611,7 +642,7 @@ export function WorkoutPage({
                   : `${currentExerciseIndex + 1} of ${currentBlock.exercises.length}`;
 
                 if (block.isCurrent) {
-                  // Current block: pill with counter inside
+                  // Current block: pill with counter inside + exercise dots
                   return (
                     <div key={idx} className="flex-[1.8]">
                       <div className="h-5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden relative">
@@ -620,7 +651,24 @@ export function WorkoutPage({
                           {counterText}
                         </span>
                       </div>
-                      <div className="mt-0.5 text-center text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold truncate">
+                      {/* Exercise progress dots (compact) */}
+                      {currentBlock && currentBlock.exercises.length > 1 && (
+                        <div className="flex justify-center gap-0.5 mt-1">
+                          {currentBlock.exercises.map((_, eIdx) => (
+                            <div
+                              key={eIdx}
+                              className={`w-1 h-1 rounded-full transition-all ${
+                                eIdx < currentExerciseIndex
+                                  ? 'bg-emerald-500'
+                                  : eIdx === currentExerciseIndex
+                                  ? 'bg-amber-400 animate-pulse'
+                                  : 'bg-slate-300 dark:bg-slate-600'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <div className={`${currentBlock && currentBlock.exercises.length > 1 ? '' : 'mt-0.5'} text-center text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold truncate`}>
                         {block.name}
                       </div>
                     </div>
@@ -717,7 +765,16 @@ export function WorkoutPage({
                   onClick={() => setShowLandscapeTip(false)}
                   className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors"
                 >
-                  Got it
+                  Use TV Mode
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLandscapeTip(false);
+                    setTvModeEnabled(false);
+                  }}
+                  className="w-full py-2.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 font-medium transition-colors mt-2"
+                >
+                  Stay in normal mode
                 </button>
               </div>
             </div>

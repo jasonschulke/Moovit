@@ -32,6 +32,10 @@ const CUSTOM_EXERCISES_KEY = 'custom_exercises';   // User-created exercises
 const CLAUDE_API_KEY = 'claude_api_key';           // AI chat API key
 const CHAT_HISTORY_KEY = 'claude_chat_history';    // AI chat message history
 const EQUIPMENT_CONFIG_KEY = 'equipment_config';   // Default weights per equipment
+const EQUIPMENT_INVENTORY_KEY = 'equipment_inventory'; // User's equipment with multiple weights
+const OWNED_GEAR_KEY = 'owned_gear';               // Which equipment types the user owns
+const BODY_METRICS_KEY = 'body_metrics';           // Body weight/fat measurements
+const ACTIVITY_DAYS_KEY = 'activity_days';         // Daily activity summaries
 const USER_NAME_KEY = 'workout_user_name';         // User's display name
 const PERSONALITY_KEY = 'workout_personality';     // AI personality preference
 const FAVORITES_KEY = 'workout_favorites';         // Favorited workouts/exercises
@@ -676,6 +680,90 @@ export function getDefaultWeightForEquipment(equipmentType: EquipmentType): numb
 }
 
 // ============================================================================
+// EQUIPMENT INVENTORY (Multiple weights per equipment type)
+// ============================================================================
+
+import type { EquipmentInventory } from '../types';
+
+const DEFAULT_EQUIPMENT_INVENTORY: EquipmentInventory = {
+  kettlebell: [25, 35, 50],
+  dumbbell: [10, 15, 20, 25],
+};
+
+export function loadEquipmentInventory(): EquipmentInventory {
+  const data = localStorage.getItem(EQUIPMENT_INVENTORY_KEY);
+  if (data) {
+    return JSON.parse(data);
+  }
+  return DEFAULT_EQUIPMENT_INVENTORY;
+}
+
+export function saveEquipmentInventory(inventory: EquipmentInventory): void {
+  localStorage.setItem(EQUIPMENT_INVENTORY_KEY, JSON.stringify(inventory));
+  triggerSyncIfLoggedIn();
+}
+
+export function addEquipmentWeight(type: Exclude<EquipmentType, 'bodyweight'>, weight: number): void {
+  const inventory = loadEquipmentInventory();
+  const existing = inventory[type] || [];
+  if (!existing.includes(weight)) {
+    inventory[type] = [...existing, weight].sort((a, b) => a - b);
+    saveEquipmentInventory(inventory);
+  }
+}
+
+export function removeEquipmentWeight(type: Exclude<EquipmentType, 'bodyweight'>, weight: number): void {
+  const inventory = loadEquipmentInventory();
+  inventory[type] = (inventory[type] || []).filter(w => w !== weight);
+  saveEquipmentInventory(inventory);
+}
+
+export function getAvailableWeightsForEquipment(type: EquipmentType): number[] {
+  if (type === 'bodyweight') return [];
+  return loadEquipmentInventory()[type] || [];
+}
+
+// OWNED GEAR (which equipment types the user has)
+// ============================================================================
+
+export function loadOwnedGear(): EquipmentType[] {
+  const data = localStorage.getItem(OWNED_GEAR_KEY);
+  if (data) {
+    return JSON.parse(data);
+  }
+  // Migrate: treat any equipment with weights as owned
+  const inventory = loadEquipmentInventory();
+  const owned: EquipmentType[] = [];
+  for (const [type, weights] of Object.entries(inventory)) {
+    if (weights && weights.length > 0) {
+      owned.push(type as EquipmentType);
+    }
+  }
+  if (owned.length > 0) {
+    saveOwnedGear(owned);
+  }
+  return owned;
+}
+
+export function saveOwnedGear(gear: EquipmentType[]): void {
+  localStorage.setItem(OWNED_GEAR_KEY, JSON.stringify(gear));
+  triggerSyncIfLoggedIn();
+}
+
+export function addOwnedGear(type: EquipmentType): void {
+  const owned = loadOwnedGear();
+  if (!owned.includes(type)) {
+    owned.push(type);
+    saveOwnedGear(owned);
+  }
+}
+
+export function removeOwnedGear(type: EquipmentType): void {
+  const owned = loadOwnedGear().filter(t => t !== type);
+  saveOwnedGear(owned);
+}
+
+// ============================================================================
 // PERSONALITY SETTINGS
 // ============================================================================
 
@@ -890,6 +978,73 @@ export function clearWorkoutDescription(workoutId: string): void {
 
 export function getWorkoutDescription(workoutId: string): string | undefined {
   return loadCustomDescriptions().workouts[workoutId];
+}
+
+// ============================================================================
+// BODY METRICS & ACTIVITY DATA (Apple Health Import)
+// ============================================================================
+
+import type { BodyMetric, ActivityDay } from '../types';
+
+export function loadBodyMetrics(): BodyMetric[] {
+  const data = localStorage.getItem(BODY_METRICS_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export function saveBodyMetrics(metrics: BodyMetric[]): void {
+  localStorage.setItem(BODY_METRICS_KEY, JSON.stringify(metrics));
+  triggerSyncIfLoggedIn();
+}
+
+export function importBodyMetrics(newMetrics: BodyMetric[]): number {
+  const existing = loadBodyMetrics();
+  const existingDates = new Set(existing.map(m => m.date));
+  const toAdd = newMetrics.filter(m => !existingDates.has(m.date));
+  if (toAdd.length > 0) {
+    const merged = [...existing, ...toAdd].sort((a, b) => a.date.localeCompare(b.date));
+    saveBodyMetrics(merged);
+  }
+  return toAdd.length;
+}
+
+export function loadActivityDays(): ActivityDay[] {
+  const data = localStorage.getItem(ACTIVITY_DAYS_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export function saveActivityDays(days: ActivityDay[]): void {
+  localStorage.setItem(ACTIVITY_DAYS_KEY, JSON.stringify(days));
+  triggerSyncIfLoggedIn();
+}
+
+export function importActivityDays(newDays: ActivityDay[]): number {
+  const existing = loadActivityDays();
+  const existingDates = new Set(existing.map(d => d.date));
+  const toAdd = newDays.filter(d => !existingDates.has(d.date));
+  if (toAdd.length > 0) {
+    const merged = [...existing, ...toAdd].sort((a, b) => a.date.localeCompare(b.date));
+    saveActivityDays(merged);
+  }
+  return toAdd.length;
+}
+
+export function importWorkoutSessions(newSessions: WorkoutSession[]): number {
+  const existing = loadSessions();
+  const existingStarts = existing.map(s => new Date(s.startedAt).getTime());
+
+  // Skip duplicates - sessions within 60 seconds of an existing session's start time
+  const toAdd = newSessions.filter(s => {
+    const startTime = new Date(s.startedAt).getTime();
+    return !existingStarts.some(t => Math.abs(t - startTime) < 60000);
+  });
+
+  if (toAdd.length > 0) {
+    const merged = [...existing, ...toAdd].sort((a, b) =>
+      new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
+    );
+    saveSessions(merged);
+  }
+  return toAdd.length;
 }
 
 // ============================================================================

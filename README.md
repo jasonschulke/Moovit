@@ -7,8 +7,12 @@ A personal workout tracking Progressive Web App (PWA) built with React, TypeScri
 - **Workout Tracking**: Log exercises with weights, reps, and duration
 - **Exercise Library**: Browse 50+ built-in exercises organized by movement pattern
 - **Custom Workouts**: Create and save workout templates to your library
-- **Progress Visualization**: GitHub-style contribution calendar and stats
-- **AI Coach**: Chat with Claude for workout advice and motivation
+- **Progress Visualization**: GitHub-style contribution calendar, sparklines, and stats
+- **AI Coach**: Chat with Claude for workout advice, motivation, and exercise suggestions
+- **Apple Health Import**: Import workouts, body metrics, and activity data from Apple Health exports
+- **Equipment Inventory**: Track your home gym gear and available weights
+- **Toast Notifications**: Contextual feedback when adding exercises or completing actions
+- **TV Mode**: Landscape workout display triggered on first rotation
 - **Offline Support**: Full PWA with offline capability
 - **Dark/Light Mode**: System-aware theme with manual toggle
 
@@ -19,43 +23,50 @@ A personal workout tracking Progressive Web App (PWA) built with React, TypeScri
 - **Tailwind CSS v4** for styling
 - **PWA** with Workbox for offline support
 - **LocalStorage** for data persistence
+- **Supabase** for optional cloud sync and auth
 
 ## Project Structure
 
 ```
 src/
-├── components/     # Reusable UI components
+├── components/         # Reusable UI components
 │   ├── Button.tsx
 │   ├── ClaudeChat.tsx
 │   ├── EffortChart.tsx
 │   ├── EffortPicker.tsx
+│   ├── EquipmentGallery.tsx
+│   ├── EquipmentManager.tsx
 │   ├── ExerciseView.tsx
+│   ├── HealthImport.tsx
 │   ├── NavBar.tsx
 │   ├── Onboarding.tsx
 │   ├── Timer.tsx
 │   ├── WorkoutBuilder.tsx
 │   └── WorkoutStartFlow.tsx
-├── data/           # Data layer and storage
-│   ├── exercises.ts    # Exercise definitions
-│   ├── storage.ts      # LocalStorage persistence
-│   ├── sync.ts         # Cloud sync (disabled)
-│   └── workouts.ts     # Workout templates
-├── hooks/          # React hooks
+├── contexts/           # React context providers
+│   └── ToastContext.tsx
+├── data/               # Data layer and storage
+│   ├── exercises.ts        # Exercise definitions
+│   ├── healthImport.ts     # Apple Health XML parser
+│   ├── storage.ts          # LocalStorage persistence
+│   ├── sync.ts             # Cloud sync
+│   └── workouts.ts         # Workout templates
+├── hooks/              # React hooks
 │   ├── useTimer.ts
 │   └── useWorkout.ts
-├── pages/          # Page components
+├── pages/              # Page components
 │   ├── HomePage.tsx
 │   ├── LibraryPage.tsx
 │   ├── SettingsPage.tsx
 │   └── WorkoutPage.tsx
-├── types/          # TypeScript type definitions
+├── types/              # TypeScript type definitions
 │   └── index.ts
-├── utils/          # Utility functions
+├── utils/              # Utility functions
 │   ├── exerciseGifs.ts
 │   └── uuid.ts
-├── App.tsx         # Main application component
-├── index.css       # Global styles and animations
-└── main.tsx        # Application entry point
+├── App.tsx             # Main application component
+├── index.css           # Global styles and animations
+└── main.tsx            # Application entry point
 ```
 
 ## Getting Started
@@ -91,21 +102,27 @@ npm run preview
 ### Workout Page
 - Start a new workout or continue saved templates
 - Log each exercise with weight, reps, and optional notes
+- View exercise progress sparklines during active workouts
 - Rate overall workout effort when complete
+- TV mode activates on first landscape rotation
 
 ### Library
 - Browse and manage saved workout templates
 - View exercise library organized by movement pattern
 - Create custom exercises
+- Manage your equipment inventory under the Gear tab
 
 ### Chat
 - Get AI-powered workout advice from Claude
 - Ask questions about form, programming, or nutrition
+- Add suggested exercises directly to your library
+- Submit feedback via the in-chat feedback button
 
 ### Settings
 - Toggle dark/light theme
-- Configure default equipment weights
 - Choose AI coach personality
+- Import Apple Health data (workouts, body metrics, activity summaries)
+- Manage custom exercises
 - Export your workout data
 
 ## Data Storage
@@ -113,8 +130,15 @@ npm run preview
 All data is stored locally in the browser's localStorage:
 - Workout sessions and history
 - Custom exercises and saved workouts
+- Equipment inventory and weights
+- Body metrics and activity data
 - User preferences and settings
 - Chat history
+
+## Credits
+
+- Animated icons by [Icons8](https://icons8.com)
+- Equipment icons from [Noun Project](https://thenounproject.com) (CC BY 3.0)
 
 ## License
 
